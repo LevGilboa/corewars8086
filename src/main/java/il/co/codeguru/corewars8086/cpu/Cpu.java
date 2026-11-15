@@ -752,123 +752,19 @@ public class Cpu {
         switch (opcode) {
             case (byte)0xD0: // <?> byte ptr [X], 1
                 m_indirect.reset();
-                switch (m_indirect.getRegIndex()) {
-                    case (byte)0x00: // ROL
-                        m_shift.rol8(1);
-                        break;
-                    case (byte)0x01: // ROR
-                        m_shift.ror8(1);
-                        break;
-                    case (byte)0x02: // RCL
-                        m_shift.rcl8(1);
-                        break;
-                    case (byte)0x03: // RCR
-                        m_shift.rcr8(1);
-                        break;
-                    case (byte)0x04: // SHL
-                        m_shift.shl8(1);
-                        break;
-                    case (byte)0x05: // SHR
-                        m_shift.shr8(1);
-                        break;
-                    case (byte)0x06: // invalid opcode
-                        throw new InvalidOpcodeException();
-                    case (byte)0x07: // SAR
-                        m_shift.sar8(1);
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
+                shiftGroup(8, 1);
                 break;
             case (byte)0xD1: // <?> word ptr [X], 1
                 m_indirect.reset();
-                switch (m_indirect.getRegIndex()) {
-                    case (byte)0x00: // ROL
-                        m_shift.rol16(1);
-                        break;
-                    case (byte)0x01: // ROR
-                        m_shift.ror16(1);
-                        break;
-                    case (byte)0x02: // RCL
-                        m_shift.rcl16(1);
-                        break;
-                    case (byte)0x03: // RCR
-                        m_shift.rcr16(1);
-                        break;
-                    case (byte)0x04: // SHL
-                        m_shift.shl16(1);
-                        break;
-                    case (byte)0x05: // SHR
-                        m_shift.shr16(1);
-                        break;
-                    case (byte)0x06: // invalid opcode
-                        throw new InvalidOpcodeException();
-                    case (byte)0x07: // SAR
-                        m_shift.sar16(1);
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
+                shiftGroup(16, 1);
                 break;
             case (byte)0xD2: // <?> byte ptr [X], CL
                 m_indirect.reset();
-                switch (m_indirect.getRegIndex()) {
-                    case (byte)0x00: // ROL
-                        m_shift.rol8(m_state.getCL());
-                        break;
-                    case (byte)0x01: // ROR
-                        m_shift.ror8(m_state.getCL());
-                        break;
-                    case (byte)0x02: // RCL
-                        m_shift.rcl8(m_state.getCL());
-                        break;
-                    case (byte)0x03: // RCR
-                        m_shift.rcr8(m_state.getCL());
-                        break;
-                    case (byte)0x04: // SHL
-                        m_shift.shl8(m_state.getCL());
-                        break;
-                    case (byte)0x05: // SHR
-                        m_shift.shr8(m_state.getCL());
-                        break;
-                    case (byte)0x06: // invalid opcode
-                        throw new InvalidOpcodeException();
-                    case (byte)0x07: // SAR
-                        m_shift.sar8(m_state.getCL());
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
+                shiftGroup(8, m_state.getCL());
                 break;
             case (byte)0xD3: // <?> word ptr [x], CL
                 m_indirect.reset();
-                switch (m_indirect.getRegIndex()) {
-                    case (byte)0x00: // ROL
-                        m_shift.rol16(m_state.getCL());
-                        break;
-                    case (byte)0x01: // ROR
-                        m_shift.ror16(m_state.getCL());
-                        break;
-                    case (byte)0x02: // RCL
-                        m_shift.rcl16(m_state.getCL());
-                        break;
-                    case (byte)0x03: // RCR
-                        m_shift.rcr16(m_state.getCL());
-                        break;
-                    case (byte)0x04: // SHL
-                        m_shift.shl16(m_state.getCL());
-                        break;
-                    case (byte)0x05: // SHR
-                        m_shift.shr16(m_state.getCL());
-                        break;
-                    case (byte)0x06: // invalid opcode
-                        throw new InvalidOpcodeException();
-                    case (byte)0x07: // SAR
-                        m_shift.sar16(m_state.getCL());
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
+                shiftGroup(16, m_state.getCL());
                 break;
             case (byte)0xD4: // TODO: AAM
             case (byte)0xD5: // TODO: AAD
@@ -966,8 +862,6 @@ public class Cpu {
     }
 
     private void opcodeFX(byte opcode) throws CpuException, MemoryException {
-        byte nextOpcode;
-        boolean doneLooping;
         switch (opcode) {
             case (byte)0xF0: // LOCK
                 throw new UnsupportedOpcodeException();
@@ -975,114 +869,10 @@ public class Cpu {
                 // 0xF1 - invalid opcode
                 throw new InvalidOpcodeException();
             case (byte)0xF2: // REPNZ
-                nextOpcode = m_fetcher.nextByte();
-                doneLooping = true;
-                if (m_state.getCX() != 0) {
-                    m_state.setCX((short)(m_state.getCX() - 1));
-                    doneLooping = false;
-                }
-                switch (nextOpcode) {
-                    case (byte)0xA6: // REPNZ CMPSB
-                        if (!doneLooping) {
-                            m_string.cmpsb();
-                            doneLooping = m_state.getZeroFlag();
-                        }
-                        break;
-                    case (byte)0xA7: // REPNZ CMPSW
-                        if (!doneLooping) {
-                            m_string.cmpsw();
-                            doneLooping = m_state.getZeroFlag();
-                        }
-                        break;
-                    case (byte)0xAE: // REPNZ SCASB
-                        if (!doneLooping) {
-                            m_string.scasb();
-                            doneLooping = m_state.getZeroFlag();
-                        }
-                        break;
-                    case (byte)0xAF: // REPNZ SCASW
-                        if (!doneLooping) {
-                            m_string.scasw();
-                            doneLooping = m_state.getZeroFlag();							
-                        }
-                        break;
-                    default:
-                        throw new InvalidOpcodeException();							
-                }				
-                // loop if needed
-                if (!doneLooping) {
-                    m_state.setIP((short)(m_state.getIP() - 2));					
-                }
-                break;				
+                repeatPrefix(true);
+                break;
             case (byte)0xF3: // REP, REPZ
-                nextOpcode = m_fetcher.nextByte();
-                doneLooping = true;
-                if (m_state.getCX() != 0) {
-                    m_state.setCX((short)(m_state.getCX() - 1));
-                    doneLooping = false;
-                }
-                switch (nextOpcode) {
-                    case (byte)0xA4: // REP MOVSB
-                        if (!doneLooping) {
-                            m_string.movsb();
-                        }
-                        break;
-                    case (byte)0xA5: // REP MOVSW
-                        if (!doneLooping) {
-                            m_string.movsw();
-                        }
-                        break;
-                    case (byte)0xA6: // REPZ CMPSB
-                        if (!doneLooping) {
-                            m_string.cmpsb();
-                            doneLooping = !m_state.getZeroFlag();
-                        }
-                        break;
-                    case (byte)0xA7: // REPZ CMPSW
-                        if (!doneLooping) {
-                            m_string.cmpsw();
-                            doneLooping = !m_state.getZeroFlag();
-                        }
-                        break;
-                    case (byte)0xAA: // REP STOSB
-                        if (!doneLooping) {
-                            m_string.stosb();
-                        }
-                        break;				
-                    case (byte)0xAB: // REP STOSW
-                        if (!doneLooping) {
-                            m_string.stosw();
-                        }
-                        break;				
-                    case (byte)0xAC: // REP LODSB
-                        if (!doneLooping) {
-                            m_string.lodsb();
-                        }
-                        break;				
-                    case (byte)0xAD: // REP LODSW
-                        if (!doneLooping) {
-                            m_string.lodsw();
-                        }
-                        break;
-                    case (byte)0xAE: // REPZ SCASB
-                        if (!doneLooping) {
-                            m_string.scasb();
-                            doneLooping = !m_state.getZeroFlag();
-                        }
-                        break;
-                    case (byte)0xAF: // REPZ SCASW
-                        if (!doneLooping) {
-                            m_string.scasw();
-                            doneLooping = !m_state.getZeroFlag();
-                        }
-                        break;
-                    default:
-                        throw new InvalidOpcodeException();
-                }				
-                // loop if needed
-                if (!doneLooping) {
-                    m_state.setIP((short)(m_state.getIP() - 2));					
-                }
+                repeatPrefix(false);
                 break;
             case (byte)0xF4: // HLT
                 throw new UnsupportedOpcodeException();
@@ -1290,6 +1080,90 @@ public class Cpu {
                 break;
             default:
                 throw new RuntimeException();
+        }
+    }
+
+    /**
+     * Shift/rotate group (opcodes 0xD0-0xD3): the operation is selected by the
+     * reg field of the current indirect operand.
+     */
+    private void shiftGroup(int bits, int count) throws CpuException, MemoryException {
+        boolean word = (bits == 16);
+        switch (m_indirect.getRegIndex()) {
+            case 0: if (word) m_shift.rol16(count); else m_shift.rol8(count); break; // ROL
+            case 1: if (word) m_shift.ror16(count); else m_shift.ror8(count); break; // ROR
+            case 2: if (word) m_shift.rcl16(count); else m_shift.rcl8(count); break; // RCL
+            case 3: if (word) m_shift.rcr16(count); else m_shift.rcr8(count); break; // RCR
+            case 4: if (word) m_shift.shl16(count); else m_shift.shl8(count); break; // SHL
+            case 5: if (word) m_shift.shr16(count); else m_shift.shr8(count); break; // SHR
+            case 6: throw new InvalidOpcodeException();
+            case 7: if (word) m_shift.sar16(count); else m_shift.sar8(count); break; // SAR
+            default: throw new RuntimeException();
+        }
+    }
+
+    /**
+     * REP/REPZ (0xF3) and REPNZ (0xF2) prefixes. Executes one iteration of the
+     * following string opcode and rewinds IP over the two bytes if the
+     * repetition should continue.
+     *
+     * @param repnz  true for REPNZ (repeat while not equal), false for REP/REPZ.
+     */
+    private void repeatPrefix(boolean repnz) throws CpuException, MemoryException {
+        byte stringOpcode = m_fetcher.nextByte();
+        boolean doneLooping = true;
+        if (m_state.getCX() != 0) {
+            m_state.setCX((short)(m_state.getCX() - 1));
+            doneLooping = false;
+        }
+
+        switch (stringOpcode) {
+            case (byte)0xA6: // CMPSB
+            case (byte)0xA7: // CMPSW
+            case (byte)0xAE: // SCASB
+            case (byte)0xAF: // SCASW
+                if (!doneLooping) {
+                    executeStringOpcode(stringOpcode);
+                    // REPZ stops on "not equal", REPNZ stops on "equal"
+                    doneLooping = repnz ? m_state.getZeroFlag() : !m_state.getZeroFlag();
+                }
+                break;
+            case (byte)0xA4: // MOVSB
+            case (byte)0xA5: // MOVSW
+            case (byte)0xAA: // STOSB
+            case (byte)0xAB: // STOSW
+            case (byte)0xAC: // LODSB
+            case (byte)0xAD: // LODSW
+                if (repnz) {
+                    throw new InvalidOpcodeException();
+                }
+                if (!doneLooping) {
+                    executeStringOpcode(stringOpcode);
+                }
+                break;
+            default:
+                throw new InvalidOpcodeException();
+        }
+
+        // loop if needed
+        if (!doneLooping) {
+            m_state.setIP((short)(m_state.getIP() - 2));
+        }
+    }
+
+    private void executeStringOpcode(byte opcode) throws MemoryException {
+        switch (opcode) {
+            case (byte)0xA4: m_string.movsb(); break;
+            case (byte)0xA5: m_string.movsw(); break;
+            case (byte)0xA6: m_string.cmpsb(); break;
+            case (byte)0xA7: m_string.cmpsw(); break;
+            case (byte)0xAA: m_string.stosb(); break;
+            case (byte)0xAB: m_string.stosw(); break;
+            case (byte)0xAC: m_string.lodsb(); break;
+            case (byte)0xAD: m_string.lodsw(); break;
+            case (byte)0xAE: m_string.scasb(); break;
+            case (byte)0xAF: m_string.scasw(); break;
+            default: throw new IllegalArgumentException();
         }
     }
 
