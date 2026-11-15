@@ -221,13 +221,15 @@ public class WarFrame extends JFrame
     /** @see CompetitionEventListener#onWarStart(long) */
     public void onWarStart(long seed) {
         addMessage("=== Session started ===");
-        nameListModel.clear();
-        warCanvas.clear();
         effectsHandler.onWarStart();
-        if (competition.getCurrentWar().isPaused()){
-			btnPause.setText("Resume");
-			btnSingleRound.setEnabled(true);
-        }
+        SwingUtilities.invokeLater(() -> {
+            nameListModel.clear();
+            warCanvas.clear();
+            if (competition.getCurrentWar().isPaused()){
+                btnPause.setText("Resume");
+                btnSingleRound.setEnabled(true);
+            }
+        });
     }
 
     /** @see CompetitionEventListener#onWarEnd(int, String) */
@@ -270,26 +272,25 @@ public class WarFrame extends JFrame
     /** @see CompetitionEventListener#onWarriorBirth(String) */
     public void onWarriorBirth(String warriorName) {
         addMessage(nRoundNumber, warriorName + " enters the arena.");
-        nameListModel.addElement(new WarriorInfo(warriorName));
         effectsHandler.onWarriorBirth();
+        SwingUtilities.invokeLater(() -> nameListModel.addElement(new WarriorInfo(warriorName)));
     }
 
     /** @see CompetitionEventListener#onWarriorDeath(String) */
     public void onWarriorDeath(String warriorName, String reason) {
         addMessage(nRoundNumber, warriorName + " died due to " + reason + ".");
-        Enumeration<WarriorInfo> namesListElements = nameListModel.elements();
-        while(namesListElements.hasMoreElements()) {
-            WarriorInfo info = namesListElements.nextElement();
-            if (info.name.equals(warriorName)) {
-                info.alive = false;
-                break;
-            }
-        }
-
-        // a bit bogus... just to make the list refresh and show the new status.
-        SwingUtilities.invokeLater(nameList::repaint);
-        
         effectsHandler.onWarriorDeath(warriorName);
+        SwingUtilities.invokeLater(() -> {
+            Enumeration<WarriorInfo> namesListElements = nameListModel.elements();
+            while(namesListElements.hasMoreElements()) {
+                WarriorInfo info = namesListElements.nextElement();
+                if (info.name.equals(warriorName)) {
+                    info.alive = false;
+                    break;
+                }
+            }
+            nameList.repaint();
+        });
     }	
 
     /**
