@@ -392,63 +392,33 @@ public class Cpu {
     }
 
     private void opcode7X(byte opcode) throws MemoryException {
-        boolean branch = false;
-        switch(opcode) {
-            case (byte)0x70: // JO
-                branch = m_state.getOverflowFlag();
-                break;
-            case (byte)0x71: // JNO
-                branch = !m_state.getOverflowFlag();
-                break;
-            case (byte)0x72: // JC,JB,JNAE
-                branch = m_state.getCarryFlag();
-                break;
-            case (byte)0x73: // JNC,JNC,JAE
-                branch = !m_state.getCarryFlag();
-                break;
-            case (byte)0x74: // JE,JZ
-                branch = m_state.getZeroFlag();
-                break;
-            case (byte)0x75: // JNE,JNZ
-                branch = !m_state.getZeroFlag();
-                break;
-            case (byte)0x76: // JBE,JNA
-                branch = (m_state.getCarryFlag() || m_state.getZeroFlag());				
-                break;
-            case (byte)0x77: // JNBE,JA
-                branch = (!m_state.getCarryFlag() && !m_state.getZeroFlag());				
-                break;
-            case (byte)0x78: // JS
-                branch = m_state.getSignFlag();			
-                break;
-            case (byte)0x79: // JNS
-                branch = !m_state.getSignFlag();			
-                break;
-            case (byte)0x7A: // JP,JPE
-                branch = m_state.getParityFlag();
-                break;
-            case (byte)0x7B: // JNP,JPO
-                branch = !m_state.getParityFlag();
-                break;
-            case (byte)0x7C: // JL,JNGE
-                branch = (m_state.getSignFlag() != m_state.getOverflowFlag());
-                break;
-            case (byte)0x7D: // JNL,JGE
-                branch = (m_state.getSignFlag() == m_state.getOverflowFlag());
-                break;
-            case (byte)0x7E: // JLE,JNG
-                branch = m_state.getZeroFlag() ||
-                        (m_state.getSignFlag() != m_state.getOverflowFlag());
-                break;
-            case (byte)0x7F: // JNLE,JG
-                branch = !m_state.getZeroFlag() &&
-                        (m_state.getSignFlag() == m_state.getOverflowFlag());
-                break;
-        }
+        boolean branch = jumpCondition(opcode);
         byte offset = m_fetcher.nextByte();
         if (branch) {
             m_state.setIP((short)(m_state.getIP() + offset));
         }
+    }
+
+    /**
+     * Evaluates the condition of a Jcc opcode (0x70-0x7F). Opcodes come in
+     * pairs: the even one tests a condition, the odd one its negation.
+     */
+    private boolean jumpCondition(byte opcode) {
+        boolean condition;
+        switch ((opcode >> 1) & 0x07) {
+            case 0: condition = m_state.getOverflowFlag(); break;                         // JO / JNO
+            case 1: condition = m_state.getCarryFlag(); break;                            // JC,JB / JNC,JAE
+            case 2: condition = m_state.getZeroFlag(); break;                             // JE,JZ / JNE,JNZ
+            case 3: condition = m_state.getCarryFlag() || m_state.getZeroFlag(); break;   // JBE / JA
+            case 4: condition = m_state.getSignFlag(); break;                             // JS / JNS
+            case 5: condition = m_state.getParityFlag(); break;                           // JP / JNP
+            case 6: condition = m_state.getSignFlag() != m_state.getOverflowFlag(); break; // JL / JGE
+            default:                                                                      // JLE / JG
+                condition = m_state.getZeroFlag()
+                        || (m_state.getSignFlag() != m_state.getOverflowFlag());
+                break;
+        }
+        return ((opcode & 0x01) == 0) == condition;
     }
 
     private void opcode8X(byte opcode) throws CpuException, MemoryException {
@@ -456,117 +426,15 @@ public class Cpu {
             case (byte)0x80: // <?> byte ptr [X], imm8
             case (byte)0x82: // TODO: opcode 0x82 is identical to opcode 0x80 ?
                 m_indirect.reset();
-                switch (m_indirect.getRegIndex()) {
-                    case 0: // ADD
-                        m_indirect.setMem8(
-                            m_alu.add8(m_indirect.getMem8(), m_fetcher.nextByte()));
-                        break;
-                    case 1: // OR
-                        m_indirect.setMem8(
-                            m_alu.or8(m_indirect.getMem8(), m_fetcher.nextByte()));
-                        break;
-                    case 2: // ADC
-                        m_indirect.setMem8(
-                            m_alu.adc8(m_indirect.getMem8(), m_fetcher.nextByte()));						
-                        break;
-                    case 3: // SBB
-                        m_indirect.setMem8(
-                            m_alu.sbb8(m_indirect.getMem8(), m_fetcher.nextByte()));						
-                        break;
-                    case 4: // AND
-                        m_indirect.setMem8(
-                            m_alu.and8(m_indirect.getMem8(), m_fetcher.nextByte()));
-                        break;
-                    case 5: // SUB
-                        m_indirect.setMem8(
-                            m_alu.sub8(m_indirect.getMem8(), m_fetcher.nextByte()));						
-                        break;
-                    case 6: // XOR
-                        m_indirect.setMem8(
-                            m_alu.xor8(m_indirect.getMem8(), m_fetcher.nextByte()));
-                        break;
-                    case 7: // CMP
-                        m_alu.sub8(m_indirect.getMem8(), m_fetcher.nextByte());
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
+                aluGroup8(m_indirect.getRegIndex(), m_indirect.getMem8(), m_fetcher.nextByte());
                 break;
             case (byte)0x81: // <?> word ptr [X], imm16
                 m_indirect.reset();
-                switch (m_indirect.getRegIndex()) {
-                    case 0: // ADD
-                        m_indirect.setMem16(
-                            m_alu.add16(m_indirect.getMem16(), m_fetcher.nextWord()));
-                        break;
-                    case 1: // OR
-                        m_indirect.setMem16(
-                            m_alu.or16(m_indirect.getMem16(), m_fetcher.nextWord()));
-                        break;
-                    case 2: // ADC
-                        m_indirect.setMem16(
-                            m_alu.adc16(m_indirect.getMem16(), m_fetcher.nextWord()));						
-                        break;
-                    case 3: // SBB
-                        m_indirect.setMem16(
-                            m_alu.sbb16(m_indirect.getMem16(), m_fetcher.nextWord()));						
-                        break;
-                    case 4: // AND
-                        m_indirect.setMem16(
-                            m_alu.and16(m_indirect.getMem16(), m_fetcher.nextWord()));
-                        break;
-                    case 5: // SUB
-                        m_indirect.setMem16(
-                            m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextWord()));						
-                        break;
-                    case 6: // XOR
-                        m_indirect.setMem16(
-                            m_alu.xor16(m_indirect.getMem16(), m_fetcher.nextWord()));
-                        break;
-                    case 7: // CMP
-                        m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextWord());
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
+                aluGroup16(m_indirect.getRegIndex(), m_indirect.getMem16(), m_fetcher.nextWord());
                 break;
             case (byte)0x83: // <?> word ptr [X], sign-extended imm8
                 m_indirect.reset();
-                switch (m_indirect.getRegIndex()) {
-                    case 0: // ADD
-                        m_indirect.setMem16(
-                            m_alu.add16(m_indirect.getMem16(), m_fetcher.nextByte()));
-                        break;
-                    case 1: // OR
-                        m_indirect.setMem16(
-                            m_alu.or16(m_indirect.getMem16(), m_fetcher.nextByte()));
-                        break;
-                    case 2: // ADC
-                        m_indirect.setMem16(
-                            m_alu.adc16(m_indirect.getMem16(), m_fetcher.nextByte()));						
-                        break;
-                    case 3: // SBB
-                        m_indirect.setMem16(
-                            m_alu.sbb16(m_indirect.getMem16(), m_fetcher.nextByte()));						
-                        break;
-                    case 4: // AND
-                        m_indirect.setMem16(
-                            m_alu.and16(m_indirect.getMem16(), m_fetcher.nextByte()));
-                        break;
-                    case 5: // SUB
-                        m_indirect.setMem16(
-                            m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextByte()));						
-                        break;
-                    case 6: // XOR
-                        m_indirect.setMem16(
-                            m_alu.xor16(m_indirect.getMem16(), m_fetcher.nextByte()));
-                        break;
-                    case 7: // CMP
-                        m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextByte());
-                        break;
-                    default:
-                        throw new RuntimeException();
-                }
+                aluGroup16(m_indirect.getRegIndex(), m_indirect.getMem16(), m_fetcher.nextByte());
                 break;
             case (byte)0x84: // TEST reg8, [X]
                 m_indirect.reset();
@@ -1423,6 +1291,43 @@ public class Cpu {
             default:
                 throw new RuntimeException();
         }
+    }
+
+    /**
+     * Group-1 ALU operation on the current 8bit indirect operand
+     * (ADD, OR, ADC, SBB, AND, SUB, XOR, CMP selected by the reg field).
+     */
+    private void aluGroup8(int operation, byte operand, byte immediate) throws MemoryException {
+        byte result;
+        switch (operation) {
+            case 0: result = m_alu.add8(operand, immediate); break;
+            case 1: result = m_alu.or8(operand, immediate); break;
+            case 2: result = m_alu.adc8(operand, immediate); break;
+            case 3: result = m_alu.sbb8(operand, immediate); break;
+            case 4: result = m_alu.and8(operand, immediate); break;
+            case 5: result = m_alu.sub8(operand, immediate); break;
+            case 6: result = m_alu.xor8(operand, immediate); break;
+            case 7: m_alu.sub8(operand, immediate); return; // CMP: flags only
+            default: throw new RuntimeException();
+        }
+        m_indirect.setMem8(result);
+    }
+
+    /** 16bit variant of {@link #aluGroup8}. */
+    private void aluGroup16(int operation, short operand, short immediate) throws MemoryException {
+        short result;
+        switch (operation) {
+            case 0: result = m_alu.add16(operand, immediate); break;
+            case 1: result = m_alu.or16(operand, immediate); break;
+            case 2: result = m_alu.adc16(operand, immediate); break;
+            case 3: result = m_alu.sbb16(operand, immediate); break;
+            case 4: result = m_alu.and16(operand, immediate); break;
+            case 5: result = m_alu.sub16(operand, immediate); break;
+            case 6: result = m_alu.xor16(operand, immediate); break;
+            case 7: m_alu.sub16(operand, immediate); return; // CMP: flags only
+            default: throw new RuntimeException();
+        }
+        m_indirect.setMem16(result);
     }
 
     private void push(short value) throws MemoryException {
