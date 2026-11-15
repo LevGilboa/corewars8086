@@ -6,7 +6,6 @@ import il.co.codeguru.corewars8086.utils.EventMulticaster;
 import java.io.*;
 import java.util.*;
 
-import javax.swing.JOptionPane;
 
 
 public class WarriorRepository {
@@ -104,9 +103,8 @@ public class WarriorRepository {
 
         File[] warriorFiles = warriorsDirectory.listFiles();
         if (warriorFiles == null) {
-            JOptionPane.showMessageDialog(null,
+            throw new java.io.FileNotFoundException(
                     "Error - survivors directory (\"" + path + "\") not found");
-            System.exit(1);
         }
 
         WarriorGroup currentGroup = null;

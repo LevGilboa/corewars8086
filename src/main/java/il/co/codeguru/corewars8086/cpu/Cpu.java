@@ -25,7 +25,9 @@ public class Cpu {
         m_fetcher = new OpcodeFetcher(m_state, m_memory);
         m_alu = new Alu(m_state);
         m_regs = new RegisterIndexingDecoder(m_state);
+        m_string = new StringOps(m_state, m_memory, m_alu);
         m_indirect = new IndirectAddressingDecoder(m_state, m_memory, m_fetcher);
+        m_shift = new ShiftOps(m_state, m_indirect, m_alu);
     }
 
     /**
@@ -715,16 +717,16 @@ public class Cpu {
                 m_memory.writeWord(address, m_state.getAX());
                 break;
             case (byte)0xA4: // MOVSB
-                movsb();
+                m_string.movsb();
                 break;
             case (byte)0xA5: // MOVSW
-                movsw();
+                m_string.movsw();
                 break;
             case (byte)0xA6: // CMPSB
-                cmpsb();
+                m_string.cmpsb();
                 break;
             case (byte)0xA7: // CMPSW
-                cmpsw();
+                m_string.cmpsw();
                 break;
             case (byte)0xA8: // TEST AL, imm8
                 m_alu.and8(m_state.getAL(), m_fetcher.nextByte());
@@ -733,22 +735,22 @@ public class Cpu {
                 m_alu.and16(m_state.getAX(), m_fetcher.nextWord());
                 break;				
             case (byte)0xAA: // STOSB
-                stosb();
+                m_string.stosb();
                 break;				
             case (byte)0xAB: // STOSW
-                stosw();
+                m_string.stosw();
                 break;				
             case (byte)0xAC: // LODSB
-                lodsb();
+                m_string.lodsb();
                 break;				
             case (byte)0xAD: // LODSW
-                lodsw();
+                m_string.lodsw();
                 break;				
             case (byte)0xAE: // SCASB
-                scasb();
+                m_string.scasb();
                 break;				
             case (byte)0xAF: // SCASW
-                scasw();
+                m_string.scasw();
                 break;				
             default:
                 throw new RuntimeException();
@@ -884,27 +886,27 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case (byte)0x00: // ROL
-                        rol8(1);
+                        m_shift.rol8(1);
                         break;
                     case (byte)0x01: // ROR
-                        ror8(1);
+                        m_shift.ror8(1);
                         break;
                     case (byte)0x02: // RCL
-                        rcl8(1);
+                        m_shift.rcl8(1);
                         break;
                     case (byte)0x03: // RCR
-                        rcr8(1);
+                        m_shift.rcr8(1);
                         break;
                     case (byte)0x04: // SHL
-                        shl8(1);
+                        m_shift.shl8(1);
                         break;
                     case (byte)0x05: // SHR
-                        shr8(1);
+                        m_shift.shr8(1);
                         break;
                     case (byte)0x06: // invalid opcode
                         throw new InvalidOpcodeException();
                     case (byte)0x07: // SAR
-                        sar8(1);
+                        m_shift.sar8(1);
                         break;
                     default:
                         throw new RuntimeException();
@@ -914,27 +916,27 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case (byte)0x00: // ROL
-                        rol16(1);
+                        m_shift.rol16(1);
                         break;
                     case (byte)0x01: // ROR
-                        ror16(1);
+                        m_shift.ror16(1);
                         break;
                     case (byte)0x02: // RCL
-                        rcl16(1);
+                        m_shift.rcl16(1);
                         break;
                     case (byte)0x03: // RCR
-                        rcr16(1);
+                        m_shift.rcr16(1);
                         break;
                     case (byte)0x04: // SHL
-                        shl16(1);
+                        m_shift.shl16(1);
                         break;
                     case (byte)0x05: // SHR
-                        shr16(1);
+                        m_shift.shr16(1);
                         break;
                     case (byte)0x06: // invalid opcode
                         throw new InvalidOpcodeException();
                     case (byte)0x07: // SAR
-                        sar16(1);
+                        m_shift.sar16(1);
                         break;
                     default:
                         throw new RuntimeException();
@@ -944,27 +946,27 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case (byte)0x00: // ROL
-                        rol8(m_state.getCL());
+                        m_shift.rol8(m_state.getCL());
                         break;
                     case (byte)0x01: // ROR
-                        ror8(m_state.getCL());
+                        m_shift.ror8(m_state.getCL());
                         break;
                     case (byte)0x02: // RCL
-                        rcl8(m_state.getCL());
+                        m_shift.rcl8(m_state.getCL());
                         break;
                     case (byte)0x03: // RCR
-                        rcr8(m_state.getCL());
+                        m_shift.rcr8(m_state.getCL());
                         break;
                     case (byte)0x04: // SHL
-                        shl8(m_state.getCL());
+                        m_shift.shl8(m_state.getCL());
                         break;
                     case (byte)0x05: // SHR
-                        shr8(m_state.getCL());
+                        m_shift.shr8(m_state.getCL());
                         break;
                     case (byte)0x06: // invalid opcode
                         throw new InvalidOpcodeException();
                     case (byte)0x07: // SAR
-                        sar8(m_state.getCL());
+                        m_shift.sar8(m_state.getCL());
                         break;
                     default:
                         throw new RuntimeException();
@@ -974,27 +976,27 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case (byte)0x00: // ROL
-                        rol16(m_state.getCL());
+                        m_shift.rol16(m_state.getCL());
                         break;
                     case (byte)0x01: // ROR
-                        ror16(m_state.getCL());
+                        m_shift.ror16(m_state.getCL());
                         break;
                     case (byte)0x02: // RCL
-                        rcl16(m_state.getCL());
+                        m_shift.rcl16(m_state.getCL());
                         break;
                     case (byte)0x03: // RCR
-                        rcr16(m_state.getCL());
+                        m_shift.rcr16(m_state.getCL());
                         break;
                     case (byte)0x04: // SHL
-                        shl16(m_state.getCL());
+                        m_shift.shl16(m_state.getCL());
                         break;
                     case (byte)0x05: // SHR
-                        shr16(m_state.getCL());
+                        m_shift.shr16(m_state.getCL());
                         break;
                     case (byte)0x06: // invalid opcode
                         throw new InvalidOpcodeException();
                     case (byte)0x07: // SAR
-                        sar16(m_state.getCL());
+                        m_shift.sar16(m_state.getCL());
                         break;
                     default:
                         throw new RuntimeException();
@@ -1114,25 +1116,25 @@ public class Cpu {
                 switch (nextOpcode) {
                     case (byte)0xA6: // REPNZ CMPSB
                         if (!doneLooping) {
-                            cmpsb();
+                            m_string.cmpsb();
                             doneLooping = m_state.getZeroFlag();
                         }
                         break;
                     case (byte)0xA7: // REPNZ CMPSW
                         if (!doneLooping) {
-                            cmpsw();
+                            m_string.cmpsw();
                             doneLooping = m_state.getZeroFlag();
                         }
                         break;
                     case (byte)0xAE: // REPNZ SCASB
                         if (!doneLooping) {
-                            scasb();
+                            m_string.scasb();
                             doneLooping = m_state.getZeroFlag();
                         }
                         break;
                     case (byte)0xAF: // REPNZ SCASW
                         if (!doneLooping) {
-                            scasw();
+                            m_string.scasw();
                             doneLooping = m_state.getZeroFlag();							
                         }
                         break;
@@ -1154,55 +1156,55 @@ public class Cpu {
                 switch (nextOpcode) {
                     case (byte)0xA4: // REP MOVSB
                         if (!doneLooping) {
-                            movsb();
+                            m_string.movsb();
                         }
                         break;
                     case (byte)0xA5: // REP MOVSW
                         if (!doneLooping) {
-                            movsw();
+                            m_string.movsw();
                         }
                         break;
                     case (byte)0xA6: // REPZ CMPSB
                         if (!doneLooping) {
-                            cmpsb();
+                            m_string.cmpsb();
                             doneLooping = !m_state.getZeroFlag();
                         }
                         break;
                     case (byte)0xA7: // REPZ CMPSW
                         if (!doneLooping) {
-                            cmpsw();
+                            m_string.cmpsw();
                             doneLooping = !m_state.getZeroFlag();
                         }
                         break;
                     case (byte)0xAA: // REP STOSB
                         if (!doneLooping) {
-                            stosb();
+                            m_string.stosb();
                         }
                         break;				
                     case (byte)0xAB: // REP STOSW
                         if (!doneLooping) {
-                            stosw();
+                            m_string.stosw();
                         }
                         break;				
                     case (byte)0xAC: // REP LODSB
                         if (!doneLooping) {
-                            lodsb();
+                            m_string.lodsb();
                         }
                         break;				
                     case (byte)0xAD: // REP LODSW
                         if (!doneLooping) {
-                            lodsw();
+                            m_string.lodsw();
                         }
                         break;
                     case (byte)0xAE: // REPZ SCASB
                         if (!doneLooping) {
-                            scasb();
+                            m_string.scasb();
                             doneLooping = !m_state.getZeroFlag();
                         }
                         break;
                     case (byte)0xAF: // REPZ SCASW
                         if (!doneLooping) {
-                            scasw();
+                            m_string.scasw();
                             doneLooping = !m_state.getZeroFlag();
                         }
                         break;
@@ -1461,413 +1463,6 @@ public class Cpu {
     }
 
     /**
-     * Implements the 'movsb' opcode.
-     * @throws MemoryException
-     */
-    private void movsb() throws MemoryException {
-        RealModeAddress src =
-            new RealModeAddress(m_state.getDS(), m_state.getSI());
-        RealModeAddress dst =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_memory.writeByte(dst, m_memory.readByte(src));
-
-        byte diff = (m_state.getDirectionFlag() ? (byte)-1 : (byte)1); 
-        m_state.setSI((short)(m_state.getSI() + diff));
-        m_state.setDI((short)(m_state.getDI() + diff));		
-    }
-
-    /**
-     * Implements the 'movsw' opcode.
-     * @throws MemoryException
-     */
-    private void movsw() throws MemoryException {
-        RealModeAddress src = 
-            new RealModeAddress(m_state.getDS(), m_state.getSI());
-        RealModeAddress dst =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_memory.writeWord(dst, m_memory.readWord(src));
-
-        byte diff = (m_state.getDirectionFlag() ? (byte)-2 : (byte)2); 
-        m_state.setSI((short)(m_state.getSI() + diff));
-        m_state.setDI((short)(m_state.getDI() + diff));		
-    }
-
-    /**
-     * Implements the 'cmpsb' opcode.
-     * @throws MemoryException
-     */
-    private void cmpsb() throws MemoryException {
-        RealModeAddress address1 =
-            new RealModeAddress(m_state.getDS(), m_state.getSI());
-        RealModeAddress address2 =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_alu.sub8(m_memory.readByte(address1), m_memory.readByte(address2));		
-
-        byte diff = (m_state.getDirectionFlag() ? (byte)-1 : (byte)1); 
-        m_state.setSI((short)(m_state.getSI() + diff));
-        m_state.setDI((short)(m_state.getDI() + diff));		
-    }
-
-    /**
-     * Implements the 'cmpsw' opcode.
-     * @throws MemoryException
-     */
-    private void cmpsw() throws MemoryException {
-        RealModeAddress address1 = 
-            new RealModeAddress(m_state.getDS(), m_state.getSI());
-        RealModeAddress address2 =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_alu.sub16(m_memory.readWord(address1), m_memory.readWord(address2));		
-
-        byte diff = (m_state.getDirectionFlag() ? (byte)-2 : (byte)2); 
-        m_state.setSI((short)(m_state.getSI() + diff));
-        m_state.setDI((short)(m_state.getDI() + diff));		
-    }	
-
-    /**
-     * Implements the 'stosb' opcode.
-     * @throws MemoryException
-     */
-    private void stosb() throws MemoryException {
-        RealModeAddress address =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_memory.writeByte(address, m_state.getAL());
-        byte diff = (m_state.getDirectionFlag() ? (byte)-1 : (byte)1); 
-        m_state.setDI((short)(m_state.getDI() + diff));
-    }
-
-    /**
-     * Implements the 'stosw' opcode.
-     * @throws MemoryException
-     */
-    private void stosw() throws MemoryException {
-        RealModeAddress address =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_memory.writeWord(address, m_state.getAX());
-        byte diff = (m_state.getDirectionFlag() ? (byte)-2 : (byte)2); 
-        m_state.setDI((short)(m_state.getDI() + diff));
-    }
-
-    /**
-     * Implements the virtual 'stosdw' opcode.
-     * @throws MemoryException
-     */
-    private void stosdw() throws MemoryException {
-        RealModeAddress address1 =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_memory.writeWord(address1, m_state.getAX());
-
-        RealModeAddress address2 =
-            new RealModeAddress(m_state.getES(), (short)(m_state.getDI() + 2));
-        m_memory.writeWord(address2, m_state.getDX());
-
-        byte diff = (m_state.getDirectionFlag() ? (byte)-4 : (byte)4); 
-        m_state.setDI((short)(m_state.getDI() + diff));
-    }
-
-    /**
-     * Implements the 'lodsb' opcode.
-     * @throws MemoryException
-     */
-    private void lodsb() throws MemoryException {
-        RealModeAddress address =
-            new RealModeAddress(m_state.getDS(), m_state.getSI());
-        m_state.setAL(m_memory.readByte(address));
-        byte diff = (m_state.getDirectionFlag() ? (byte)-1 : (byte)1); 
-        m_state.setSI((short)(m_state.getSI() + diff));		
-    }
-
-    /**
-     * Implements the 'lodsw' opcode.
-     * @throws MemoryException
-     */
-    private void lodsw() throws MemoryException {
-        RealModeAddress address =
-            new RealModeAddress(m_state.getDS(), m_state.getSI());
-        m_state.setAX(m_memory.readWord(address));
-        byte diff = (m_state.getDirectionFlag() ? (byte)-2 : (byte)2); 
-        m_state.setSI((short)(m_state.getSI() + diff));
-    }
-
-    /**
-     * Implements the 'scasb' opcode.
-     * @throws MemoryException
-     */
-    private void scasb() throws MemoryException {
-        RealModeAddress address =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_alu.sub8(m_state.getAL(), m_memory.readByte(address));
-        byte diff = (m_state.getDirectionFlag() ? (byte)-1 : (byte)1); 
-        m_state.setDI((short)(m_state.getDI() + diff));
-    }
-
-    /**
-     * Implements the 'scasw' opcode.
-     * @throws MemoryException
-     */
-    private void scasw() throws MemoryException {
-        RealModeAddress address =
-            new RealModeAddress(m_state.getES(), m_state.getDI());
-        m_alu.sub16(m_state.getAX(), m_memory.readWord(address));
-        byte diff = (m_state.getDirectionFlag() ? (byte)-2 : (byte)2); 
-        m_state.setDI((short)(m_state.getDI() + diff));
-    }
-
-    private void rol8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-
-            val = (byte)((val << 1) | msb1);
-            m_indirect.setMem8(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    private void ror8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (byte)(((val & 0xFF) >>> 1) | (lsb << 7));
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    private void rcl8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (byte)((val << 1) | cf);
-            m_indirect.setMem8(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    private void rcr8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (byte)(((val & 0xFF) >>> 1) | (cf << 7));
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    private void shl8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-
-            val = (byte)(val << 1);
-            m_indirect.setMem8(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow8(val);
-        }
-    }
-
-    private void shr8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (byte)((val & 0xFF) >>> 1);
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow8(val);
-        }
-    }
-
-    private void sar8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (byte)(val >> 1);
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow8(val);
-        }
-    }
-
-    private void rol16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            val = (short)((val << 1) | msb1);
-            m_indirect.setMem16(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow16(val);
-        }
-    }
-
-    private void ror16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (short)(((val & 0xFFFF) >>> 1) | (lsb << 15));
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow16(val);
-        }
-    }
-
-    private void rcl16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (short)((val << 1) | cf);
-            m_indirect.setMem16(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow16(val);
-        }
-    }
-
-    private void rcr16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (short)(((val & 0xFFFF) >>> 1) | (cf << 15));
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    private void shl16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            val = (short)(val << 1);
-            m_indirect.setMem16(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_state.setZeroFlag(val == 0);
-        }
-    }
-
-    private void shr16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (short) ((val & 0xFFFF) >>> 1);
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_state.setZeroFlag(val == 0);
-        }
-    }
-
-    private void sar16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (short)(val >> 1);
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);			
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_state.setZeroFlag(val == 0);
-        }
-    }
-
-
-    /**
      * Implements the virtual INT 0x86 opcode.
      * If enough bombs are left, calls the stosdw virtual
      * opcode 64 times.  
@@ -1880,7 +1475,7 @@ public class Cpu {
             m_state.setBomb1Count((byte)(bombCount - 1));
 
             for (int i = 0; i < 64; ++i) {
-                stosdw();
+                m_string.stosdw();
             }
         }
     }
@@ -1924,6 +1519,12 @@ public class Cpu {
 
     /** Real-Mode memory used by this class */
     private final RealModeMemory m_memory;
+
+    /** String instructions */
+    private final StringOps m_string;
+
+    /** Shift and rotate instructions */
+    private final ShiftOps m_shift;
 
     /** Performs arithmetic/logic operations and updates flags */
     private final Alu m_alu;
