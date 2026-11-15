@@ -15,7 +15,8 @@ import java.util.List;
 
 /**
  * Enhanced Arena Map View with coordinate axes (0000-E000 on Y, 00-E0 on X),
- * register pointer callouts (CS:IP, DS:AX, DS:BX, etc.), and pixel value inspection.
+ * register pointer callouts (CS:IP, DS:AX, DS:BX, etc.), pixel value inspection,
+ * and faint/ghost preview of the pending instruction's memory write or branch target.
  */
 public class ArenaMapView extends JComponent {
     private static final long serialVersionUID = 1L;
@@ -31,6 +32,13 @@ public class ArenaMapView extends JComponent {
 
     private int hoveredOffset = -1;
     private byte hoveredVal = (byte) 0xCC;
+
+    // Ghost preview for the next opcode action
+    private Integer ghostTargetOffset = null;
+    private boolean ghostIsWrite = false;
+    private int ghostLength = 1;
+    private String ghostLabel = null;
+    private int ghostIpOffset = 0;
 
     // Callout pointers
     public static class PointerBadge {
@@ -113,6 +121,15 @@ public class ArenaMapView extends JComponent {
                 activePointers.add(new PointerBadge("SS:BP", s.getBP() & 0xFFFF, new Color(255, 130, 130)));
             }
         }
+        repaint();
+    }
+
+    public void setGhostPreview(Integer targetOffset, boolean isWrite, int length, String label, int ipOffset) {
+        this.ghostTargetOffset = targetOffset;
+        this.ghostIsWrite = isWrite;
+        this.ghostLength = length;
+        this.ghostLabel = label;
+        this.ghostIpOffset = ipOffset;
         repaint();
     }
 
@@ -199,6 +216,72 @@ public class ArenaMapView extends JComponent {
             String label = String.format("%02X", xOff);
             g2.drawString(label, tickX - 6, mapY + mapH + 15);
             g2.drawLine(tickX, mapY + mapH, tickX, mapY + mapH + 4);
+        }
+
+        // Draw Ghost / Faint Preview of Next Opcode Action
+        if (ghostTargetOffset != null) {
+            int targetX = ghostTargetOffset % ARENA_DIM;
+            int targetY = ghostTargetOffset / ARENA_DIM;
+            int pixelX = mapX + (int) (targetX * scaleX);
+            int pixelY = mapY + (int) (targetY * scaleY);
+
+            int ipX = ghostIpOffset % ARENA_DIM;
+            int ipY = ghostIpOffset / ARENA_DIM;
+            int curIpPixelX = mapX + (int) (ipX * scaleX);
+            int curIpPixelY = mapY + (int) (ipY * scaleY);
+
+            Color ghostPrimary = ghostIsWrite ? new Color(255, 110, 40) : new Color(40, 200, 255);
+            Color ghostHalo = ghostIsWrite ? new Color(255, 100, 30, 80) : new Color(30, 180, 255, 80);
+            Color ghostDashed = ghostIsWrite ? new Color(255, 140, 50, 180) : new Color(80, 210, 255, 180);
+
+            // 1. Dashed trajectory line from current CS:IP to target
+            Stroke oldStroke = g2.getStroke();
+            Stroke dashed = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{5, 4}, 0);
+            g2.setStroke(dashed);
+            g2.setColor(ghostDashed);
+            g2.drawLine(curIpPixelX, curIpPixelY, pixelX, pixelY);
+            g2.setStroke(oldStroke);
+
+            // 2. Affected bytes preview (for writes spanning multiple bytes, e.g. INT 86 bomb or MOVSW)
+            if (ghostIsWrite && ghostLength > 1) {
+                g2.setColor(new Color(255, 120, 40, 120));
+                for (int i = 0; i < Math.min(ghostLength, 256); i++) {
+                    int off = (ghostTargetOffset + i) & 0xFFFF;
+                    int bx = mapX + (int) ((off % ARENA_DIM) * scaleX);
+                    int by = mapY + (int) ((off / ARENA_DIM) * scaleY);
+                    g2.fillRect(bx, by, Math.max(2, (int) Math.ceil(scaleX)), Math.max(2, (int) Math.ceil(scaleY)));
+                }
+            }
+
+            // 3. Faint pulsating halo / highlight box at target
+            int haloSize = 14;
+            g2.setColor(ghostHalo);
+            g2.fillOval(pixelX - haloSize / 2, pixelY - haloSize / 2, haloSize, haloSize);
+
+            // 4. Crosshair / Target reticle
+            g2.setColor(ghostPrimary);
+            g2.drawRect(pixelX - 4, pixelY - 4, 8, 8);
+            g2.drawLine(pixelX - 6, pixelY, pixelX + 6, pixelY);
+            g2.drawLine(pixelX, pixelY - 6, pixelX, pixelY + 6);
+
+            // 5. Floating preview badge tag
+            if (ghostLabel != null && !ghostLabel.isEmpty()) {
+                g2.setFont(new Font("Consolas", Font.BOLD, 10));
+                int tagW = g2.getFontMetrics().stringWidth(ghostLabel) + 12;
+                int tagH = 18;
+
+                int tagX = pixelX + 10;
+                int tagY = pixelY - 22;
+                if (tagX + tagW > mapX + mapW) tagX = pixelX - tagW - 8;
+                if (tagY < mapY + 4) tagY = pixelY + 10;
+
+                g2.setColor(new Color(20, 24, 32, 220));
+                g2.fillRoundRect(tagX, tagY, tagW, tagH, 6, 6);
+                g2.setColor(ghostPrimary);
+                g2.drawRoundRect(tagX, tagY, tagW, tagH, 6, 6);
+
+                g2.drawString(ghostLabel, tagX + 6, tagY + 13);
+            }
         }
 
         // Draw Callout Pointers (Labels & Lines to grid)

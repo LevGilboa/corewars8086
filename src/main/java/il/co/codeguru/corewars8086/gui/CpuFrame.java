@@ -4,6 +4,7 @@ import il.co.codeguru.corewars8086.cpu.CpuState;
 import il.co.codeguru.corewars8086.memory.RealModeAddress;
 import il.co.codeguru.corewars8086.memory.RealModeMemory;
 import il.co.codeguru.corewars8086.utils.Disassembler;
+import il.co.codeguru.corewars8086.utils.InstructionAnalyzer;
 import il.co.codeguru.corewars8086.utils.Unsigned;
 import il.co.codeguru.corewars8086.war.Competition;
 import il.co.codeguru.corewars8086.war.CompetitionEventListener;
@@ -15,6 +16,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.event.MouseEvent;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,7 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
     private JTextPane codePane;
     private int customViewOffset = -1;
     private int stepCount = 0;
+    private List<Disassembler.DecodedInstruction> currentRenderedInstructions;
 
     // Registers
     private final Map<String, JTextField> regFields = new HashMap<>();
@@ -134,12 +137,47 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
 
         col.add(topBar, BorderLayout.NORTH);
 
-        // Code Disassembly Box
-        codePane = new JTextPane();
+        // Code Disassembly Box with Interactive Micro-Step Tooltip Inspection
+        codePane = new JTextPane() {
+            @Override
+            public String getToolTipText(MouseEvent e) {
+                try {
+                    int pos = viewToModel2D(e.getPoint());
+                    if (pos >= 0 && currentRenderedInstructions != null) {
+                        javax.swing.text.Document doc = getDocument();
+                        javax.swing.text.Element root = doc.getDefaultRootElement();
+                        int lineIdx = root.getElementIndex(pos);
+                        if (lineIdx >= 0 && lineIdx < root.getElementCount()) {
+                            javax.swing.text.Element lineElem = root.getElement(lineIdx);
+                            int start = lineElem.getStartOffset();
+                            int end = lineElem.getEndOffset();
+                            String lineText = doc.getText(start, end - start).trim();
+                            if (lineText.length() >= 4) {
+                                String hexOff = lineText.substring(0, 4);
+                                try {
+                                    int off = Integer.parseInt(hexOff, 16);
+                                    for (Disassembler.DecodedInstruction di : currentRenderedInstructions) {
+                                        if (di.offset == off) {
+                                            Warrior w = getSelectedWarrior();
+                                            CpuState st = (w != null) ? w.getCpuState() : null;
+                                            return InstructionAnalyzer.getInstructionTooltip(di.text, st, di);
+                                        }
+                                    }
+                                } catch (NumberFormatException ignored) {}
+                            }
+                        }
+                    }
+                } catch (Exception ignored) {}
+                return super.getToolTipText(e);
+            }
+        };
         codePane.setEditable(false);
         codePane.setContentType("text/html");
         codePane.setBackground(Color.WHITE);
         codePane.setFont(MONO_FONT);
+        ToolTipManager.sharedInstance().registerComponent(codePane);
+        ToolTipManager.sharedInstance().setInitialDelay(150);
+        ToolTipManager.sharedInstance().setDismissDelay(15000);
         JScrollPane codeScroll = new JScrollPane(codePane);
         codeScroll.setBorder(BorderFactory.createLineBorder(new Color(200, 205, 215)));
         col.add(codeScroll, BorderLayout.CENTER);
@@ -400,6 +438,17 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
             flagBoxes.get("PF").setSelected(s.getParityFlag());
             flagBoxes.get("CF").setSelected(s.getCarryFlag());
 
+            // Instruction Analysis & Ghost Preview on Map & Code Tooltip
+            InstructionAnalyzer.StepPreview preview = InstructionAnalyzer.analyze(mem, s);
+            arenaMapView.setGhostPreview(
+                    preview.targetMemoryOffset,
+                    preview.isWrite,
+                    preview.length,
+                    preview.label,
+                    s.getIP() & 0xFFFF
+            );
+            codePane.setToolTipText(preview.tooltipHtml);
+
             // Render Disassembly
             short baseOffset = (customViewOffset != -1) ? (short) customViewOffset : s.getIP();
             renderDisassembly(mem, s.getCS(), baseOffset, s.getIP());
@@ -435,6 +484,7 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
         // Disassemble 6 instructions before target, current instruction in middle, and 8 instructions after
         List<Disassembler.DecodedInstruction> instrs =
                 Disassembler.disassembleCentered(mem, cs, targetOffset, 6, 8);
+        this.currentRenderedInstructions = instrs;
 
         StringBuilder html = new StringBuilder();
         html.append("<html><body style='font-family:Consolas,monospace; font-size:12px; margin:2px;'>");
