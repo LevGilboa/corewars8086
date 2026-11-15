@@ -4,6 +4,7 @@ import il.co.codeguru.corewars8086.cpu.CpuState;
 import il.co.codeguru.corewars8086.memory.RealModeAddress;
 import il.co.codeguru.corewars8086.memory.RealModeMemory;
 import il.co.codeguru.corewars8086.utils.Disassembler;
+import il.co.codeguru.corewars8086.utils.Unsigned;
 import il.co.codeguru.corewars8086.war.Competition;
 import il.co.codeguru.corewars8086.war.CompetitionEventListener;
 import il.co.codeguru.corewars8086.war.War;
@@ -12,57 +13,65 @@ import il.co.codeguru.corewars8086.war.Warrior;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Modern, rich CPU Debugger & State Viewer for CoreWars 8086.
+ * Full-featured 8086 Integrated Debugger:
+ * - Code Disassembly with Go-To navigation
+ * - Stack, Shared Memory & Watch tables
+ * - Full 16-bit Register & Flag bank
+ * - Interactive Arena Map with Axes & Dynamic Register Pointers
  */
 public class CpuFrame extends JFrame implements CompetitionEventListener {
     private static final long serialVersionUID = 1L;
 
     private final Competition competition;
+
+    // Controls
     private JComboBox<String> warriorSelector;
+    private JTextField txtGoTo;
+    private JButton btnGoTo;
+    private JLabel lblStepCounter;
+    private JButton btnResumePause;
     private JButton btnStep;
-    private JButton btnPauseResume;
-    private JButton btnRefresh;
-    private JLabel lblStatus;
+    private JSlider speedSlider;
+    private JLabel lblSpeedValue;
+
+    // Disassembly
+    private JTextPane codePane;
+    private int customViewOffset = -1;
+    private int stepCount = 0;
 
     // Registers
     private final Map<String, JTextField> regFields = new HashMap<>();
-    private final Map<String, Short> previousRegValues = new HashMap<>();
+    private final Map<String, Short> prevRegs = new HashMap<>();
+    private final Map<String, JCheckBox> flagBoxes = new HashMap<>();
 
-    // Flags
-    private final Map<String, JLabel> flagLabels = new HashMap<>();
-
-    // Disassembly view
-    private JTextPane codePane;
-
-    // Stack view
+    // Middle column views
     private JTextArea stackArea;
+    private JTextArea sharedArea;
+    private JTable watchTable;
+    private DefaultTableModel watchModel;
 
-    private static final Color DARK_BG = new Color(28, 30, 36);
-    private static final Color PANEL_BG = new Color(36, 40, 48);
-    private static final Color TEXT_COLOR = new Color(220, 224, 232);
-    private static final Color ACCENT_COLOR = new Color(74, 144, 226);
-    private static final Color HIGHLIGHT_CHANGED = new Color(255, 179, 71);
-    private static final Color FLAG_ON_BG = new Color(46, 139, 87);
-    private static final Color FLAG_OFF_BG = new Color(60, 64, 72);
+    // Right column: Arena Map
+    private ArenaMapView arenaMapView;
 
-    private static final Font MONO_FONT = new Font("Consolas", Font.PLAIN, 13);
-    private static final Font MONO_BOLD = new Font("Consolas", Font.BOLD, 13);
+    private static final Font MONO_FONT = new Font("Consolas", Font.PLAIN, 12);
+    private static final Font MONO_BOLD = new Font("Consolas", Font.BOLD, 12);
 
     public CpuFrame(Competition competition) {
-        super("8086 CPU Debugger & State Viewer");
+        super("CodeGuru 8086 - Professional Debugger");
         this.competition = competition;
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-        setSize(960, 680);
-        setMinimumSize(new Dimension(800, 500));
+        setSize(1220, 720);
+        setMinimumSize(new Dimension(1000, 600));
         setLocationRelativeTo(null);
 
-        initComponents();
+        buildUI();
         updateWarriorList();
         refreshState();
 
@@ -70,211 +79,225 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
         setVisible(true);
     }
 
-    private void initComponents() {
-        JPanel root = new JPanel(new BorderLayout(8, 8));
-        root.setBackground(DARK_BG);
-        root.setBorder(new EmptyBorder(10, 10, 10, 10));
+    private void buildUI() {
+        JPanel root = new JPanel(new GridLayout(1, 3, 6, 6));
+        root.setBackground(new Color(240, 242, 245));
+        root.setBorder(new EmptyBorder(6, 6, 6, 6));
 
-        // Top Toolbar
-        root.add(buildTopBar(), BorderLayout.NORTH);
+        // Column 1: Code, Controls & Registers
+        root.add(buildLeftColumn());
 
-        // Center split: Left (Code & Stack), Right (Registers & Flags)
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, buildCodeAndStackPanel(), buildRegistersPanel());
-        splitPane.setResizeWeight(0.55);
-        splitPane.setBackground(DARK_BG);
-        splitPane.setBorder(null);
-        root.add(splitPane, BorderLayout.CENTER);
+        // Column 2: Stack, Shared Memory, Watch
+        root.add(buildMiddleColumn());
 
-        // Bottom status bar
-        JPanel statusBar = new JPanel(new BorderLayout());
-        statusBar.setBackground(DARK_BG);
-        lblStatus = new JLabel(" Ready");
-        lblStatus.setForeground(new Color(160, 170, 185));
-        lblStatus.setFont(new Font("SansSerif", Font.PLAIN, 12));
-        statusBar.add(lblStatus, BorderLayout.WEST);
-        root.add(statusBar, BorderLayout.SOUTH);
+        // Column 3: Arena Map with coordinate axes & pointers
+        root.add(buildRightColumn());
 
         setContentPane(root);
     }
 
-    private JPanel buildTopBar() {
-        JPanel bar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 5));
-        bar.setBackground(PANEL_BG);
-        bar.setBorder(BorderFactory.createLineBorder(new Color(55, 60, 72)));
+    private JPanel buildLeftColumn() {
+        JPanel col = new JPanel(new BorderLayout(0, 6));
+        col.setOpaque(false);
 
-        JLabel selectLabel = new JLabel("Warrior:");
-        selectLabel.setForeground(TEXT_COLOR);
-        selectLabel.setFont(new Font("SansSerif", Font.BOLD, 12));
-        bar.add(selectLabel);
+        // Top bar: Warrior, Go To, Step Counter
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
+        topBar.setBackground(Color.WHITE);
+        topBar.setBorder(BorderFactory.createLineBorder(new Color(200, 205, 215)));
 
         warriorSelector = new JComboBox<>();
-        warriorSelector.setPreferredSize(new Dimension(160, 26));
+        warriorSelector.setPreferredSize(new Dimension(130, 24));
         warriorSelector.addActionListener(e -> {
-            previousRegValues.clear();
+            customViewOffset = -1;
             refreshState();
         });
-        bar.add(warriorSelector);
+        topBar.add(warriorSelector);
 
-        bar.add(Box.createHorizontalStrut(10));
+        txtGoTo = new JTextField(4);
+        btnGoTo = new JButton("go to");
+        btnGoTo.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        btnGoTo.addActionListener(e -> {
+            try {
+                customViewOffset = Integer.parseInt(txtGoTo.getText().trim(), 16) & 0xFFFF;
+                refreshState();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Enter a valid hex offset (e.g. C69B)");
+            }
+        });
+        topBar.add(txtGoTo);
+        topBar.add(btnGoTo);
 
-        btnStep = new JButton(" Step (Single Opcode) ");
-        styleButton(btnStep, new Color(40, 120, 200));
-        btnStep.addActionListener(e -> doStep());
-        bar.add(btnStep);
+        lblStepCounter = new JLabel("Step: 0");
+        lblStepCounter.setFont(new Font("SansSerif", Font.BOLD, 12));
+        topBar.add(Box.createHorizontalStrut(6));
+        topBar.add(lblStepCounter);
 
-        btnPauseResume = new JButton("Pause");
-        styleButton(btnPauseResume, new Color(100, 105, 115));
-        btnPauseResume.addActionListener(e -> togglePause());
-        bar.add(btnPauseResume);
+        col.add(topBar, BorderLayout.NORTH);
 
-        btnRefresh = new JButton("Refresh");
-        styleButton(btnRefresh, new Color(70, 75, 85));
-        btnRefresh.addActionListener(e -> refreshState());
-        bar.add(btnRefresh);
-
-        return bar;
-    }
-
-    private void styleButton(JButton btn, Color bg) {
-        btn.setBackground(bg);
-        btn.setForeground(Color.WHITE);
-        btn.setFocusPainted(false);
-        btn.setFont(new Font("SansSerif", Font.BOLD, 12));
-        btn.setBorder(BorderFactory.createEmptyBorder(5, 12, 5, 12));
-    }
-
-    private JPanel buildCodeAndStackPanel() {
-        JPanel panel = new JPanel(new BorderLayout(0, 8));
-        panel.setBackground(DARK_BG);
-
-        // Disassembly Panel
-        JPanel codeContainer = new JPanel(new BorderLayout());
-        codeContainer.setBackground(PANEL_BG);
-        codeContainer.setBorder(createTitledBorder("Disassembly around CS:IP"));
-
+        // Code Disassembly Box
         codePane = new JTextPane();
         codePane.setEditable(false);
-        codePane.setBackground(new Color(20, 22, 26));
-        codePane.setForeground(TEXT_COLOR);
-        codePane.setFont(MONO_FONT);
         codePane.setContentType("text/html");
-
+        codePane.setBackground(Color.WHITE);
+        codePane.setFont(MONO_FONT);
         JScrollPane codeScroll = new JScrollPane(codePane);
-        codeScroll.setBorder(null);
-        codeContainer.add(codeScroll, BorderLayout.CENTER);
+        codeScroll.setBorder(BorderFactory.createLineBorder(new Color(200, 205, 215)));
+        col.add(codeScroll, BorderLayout.CENTER);
+
+        // Bottom section: Controls + Registers + Flags
+        JPanel bottomSection = new JPanel();
+        bottomSection.setLayout(new BoxLayout(bottomSection, BoxLayout.Y_AXIS));
+        bottomSection.setBackground(Color.WHITE);
+        bottomSection.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(200, 205, 215)),
+                new EmptyBorder(6, 6, 6, 6)));
+
+        // Buttons & Speed
+        JPanel controlRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        controlRow.setOpaque(false);
+        btnResumePause = new JButton("Resume");
+        btnResumePause.addActionListener(e -> togglePause());
+        btnStep = new JButton("Step");
+        btnStep.addActionListener(e -> doStep());
+        controlRow.add(btnResumePause);
+        controlRow.add(btnStep);
+
+        controlRow.add(new JLabel("Speed:"));
+        speedSlider = new JSlider(0, 10, 0);
+        speedSlider.setPreferredSize(new Dimension(80, 20));
+        lblSpeedValue = new JLabel("0");
+        speedSlider.addChangeListener(e -> {
+            int val = speedSlider.getValue();
+            lblSpeedValue.setText(String.valueOf(val));
+            competition.setSpeed(val == 0 ? 1 : (int) Math.pow(1.5, val));
+        });
+        controlRow.add(speedSlider);
+        controlRow.add(lblSpeedValue);
+        bottomSection.add(controlRow);
+        bottomSection.add(Box.createVerticalStrut(4));
+
+        // Registers grid: 4 columns x 4 rows
+        JPanel regGrid = new JPanel(new GridLayout(4, 4, 4, 3));
+        regGrid.setOpaque(false);
+
+        String[][] rLayout = {
+                {"AX", "BX", "CX", "DX"},
+                {"SI", "DI", "BP", "SP"},
+                {"CS", "DS", "SS", "ES"},
+                {"IP", "Energy", "Flags", ""}
+        };
+
+        for (String[] row : rLayout) {
+            for (String rName : row) {
+                if (rName.isEmpty()) {
+                    regGrid.add(new JLabel(""));
+                    continue;
+                }
+                JPanel box = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 0));
+                box.setOpaque(false);
+                JLabel lbl = new JLabel(rName + ":");
+                lbl.setFont(new Font("Consolas", Font.BOLD, 11));
+                JTextField tf = new JTextField("0000", rName.equals("Energy") ? 5 : 4);
+                tf.setFont(MONO_FONT);
+                tf.setEditable(false);
+                tf.setBackground(new Color(250, 250, 252));
+                tf.setHorizontalAlignment(JTextField.CENTER);
+                regFields.put(rName, tf);
+                box.add(lbl);
+                box.add(tf);
+                regGrid.add(box);
+            }
+        }
+        bottomSection.add(regGrid);
+        bottomSection.add(Box.createVerticalStrut(4));
+
+        // Flags row
+        JPanel flagRow = new JPanel(new GridLayout(1, 9, 2, 0));
+        flagRow.setOpaque(false);
+        String[] flagNames = {"OF", "DF", "IF", "TF", "SF", "ZF", "AF", "PF", "CF"};
+        for (String f : flagNames) {
+            JPanel fBox = new JPanel(new BorderLayout());
+            fBox.setOpaque(false);
+            JLabel fLbl = new JLabel(f, SwingConstants.CENTER);
+            fLbl.setFont(new Font("SansSerif", Font.PLAIN, 10));
+            JCheckBox cb = new JCheckBox();
+            cb.setHorizontalAlignment(SwingConstants.CENTER);
+            cb.setEnabled(false);
+            flagBoxes.put(f, cb);
+            fBox.add(fLbl, BorderLayout.NORTH);
+            fBox.add(cb, BorderLayout.CENTER);
+            flagRow.add(fBox);
+        }
+        bottomSection.add(flagRow);
+
+        col.add(bottomSection, BorderLayout.SOUTH);
+        return col;
+    }
+
+    private JPanel buildMiddleColumn() {
+        JPanel col = new JPanel(new GridLayout(3, 1, 0, 6));
+        col.setOpaque(false);
 
         // Stack Panel
-        JPanel stackContainer = new JPanel(new BorderLayout());
-        stackContainer.setBackground(PANEL_BG);
-        stackContainer.setBorder(createTitledBorder("Stack (SS:SP)"));
-        stackContainer.setPreferredSize(new Dimension(100, 150));
-
+        JPanel stackPanel = new JPanel(new BorderLayout());
+        stackPanel.setBackground(Color.WHITE);
+        stackPanel.setBorder(createPanelHeader("Stack"));
         stackArea = new JTextArea();
-        stackArea.setEditable(false);
-        stackArea.setBackground(new Color(20, 22, 26));
-        stackArea.setForeground(new Color(180, 220, 255));
         stackArea.setFont(MONO_FONT);
-        JScrollPane stackScroll = new JScrollPane(stackArea);
-        stackScroll.setBorder(null);
-        stackContainer.add(stackScroll, BorderLayout.CENTER);
+        stackArea.setEditable(false);
+        stackPanel.add(new JScrollPane(stackArea), BorderLayout.CENTER);
+        col.add(stackPanel);
 
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, codeContainer, stackContainer);
-        split.setResizeWeight(0.75);
-        split.setBackground(DARK_BG);
-        split.setBorder(null);
-        panel.add(split, BorderLayout.CENTER);
+        // Shared Memory Panel
+        JPanel sharedPanel = new JPanel(new BorderLayout());
+        sharedPanel.setBackground(Color.WHITE);
+        sharedPanel.setBorder(createPanelHeader("Shared Memory"));
+        sharedArea = new JTextArea();
+        sharedArea.setFont(MONO_FONT);
+        sharedArea.setEditable(false);
+        sharedPanel.add(new JScrollPane(sharedArea), BorderLayout.CENTER);
+        col.add(sharedPanel);
 
-        return panel;
+        // Watch Panel
+        JPanel watchPanel = new JPanel(new BorderLayout());
+        watchPanel.setBackground(Color.WHITE);
+        watchPanel.setBorder(createPanelHeader("Watch"));
+        watchModel = new DefaultTableModel(new String[]{"Address", "Value (Word)"}, 0);
+        watchTable = new JTable(watchModel);
+        watchTable.setFont(MONO_FONT);
+        watchPanel.add(new JScrollPane(watchTable), BorderLayout.CENTER);
+
+        JPanel watchBtnRow = new JPanel(new FlowLayout(FlowLayout.RIGHT, 4, 2));
+        JButton btnAddWatch = new JButton("+ Add");
+        btnAddWatch.setFont(new Font("SansSerif", Font.PLAIN, 10));
+        btnAddWatch.addActionListener(e -> {
+            String input = JOptionPane.showInputDialog(this, "Enter Linear Address (Hex):", "10000");
+            if (input != null && !input.trim().isEmpty()) {
+                watchModel.addRow(new Object[]{input.trim().toUpperCase(), "0000"});
+                refreshState();
+            }
+        });
+        watchBtnRow.add(btnAddWatch);
+        watchPanel.add(watchBtnRow, BorderLayout.SOUTH);
+        col.add(watchPanel);
+
+        return col;
     }
 
-    private JPanel buildRegistersPanel() {
-        JPanel panel = new JPanel();
-        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        panel.setBackground(DARK_BG);
-
-        // General Purpose Registers
-        JPanel general = new JPanel(new GridLayout(2, 4, 8, 8));
-        general.setBackground(PANEL_BG);
-        general.setBorder(createTitledBorder("General Registers (16-bit)"));
-        String[] gRegs = {"AX", "BX", "CX", "DX"};
-        for (String r : gRegs) {
-            general.add(createRegBox(r));
-        }
-        panel.add(general);
-        panel.add(Box.createVerticalStrut(8));
-
-        // Index / Pointer Registers
-        JPanel pointers = new JPanel(new GridLayout(2, 4, 8, 8));
-        pointers.setBackground(PANEL_BG);
-        pointers.setBorder(createTitledBorder("Pointers & Index Registers"));
-        String[] pRegs = {"SI", "DI", "BP", "SP"};
-        for (String r : pRegs) {
-            pointers.add(createRegBox(r));
-        }
-        panel.add(pointers);
-        panel.add(Box.createVerticalStrut(8));
-
-        // Segment Registers + IP + Energy
-        JPanel segments = new JPanel(new GridLayout(2, 4, 8, 8));
-        segments.setBackground(PANEL_BG);
-        segments.setBorder(createTitledBorder("Segments, IP & Energy"));
-        String[] sRegs = {"CS", "IP", "DS", "ES", "SS", "Energy"};
-        for (String r : sRegs) {
-            segments.add(createRegBox(r));
-        }
-        panel.add(segments);
-        panel.add(Box.createVerticalStrut(8));
-
-        // Flags
-        JPanel flags = new JPanel(new GridLayout(2, 5, 6, 6));
-        flags.setBackground(PANEL_BG);
-        flags.setBorder(createTitledBorder("Flags Register"));
-        String[] flagNames = {"CF", "ZF", "SF", "OF", "PF", "AF", "DF", "IF", "TF"};
-        for (String f : flagNames) {
-            flags.add(createFlagBadge(f));
-        }
-        panel.add(flags);
-
-        return panel;
+    private JPanel buildRightColumn() {
+        JPanel col = new JPanel(new BorderLayout());
+        col.setOpaque(false);
+        arenaMapView = new ArenaMapView();
+        col.add(arenaMapView, BorderLayout.CENTER);
+        return col;
     }
 
-    private JPanel createRegBox(String name) {
-        JPanel p = new JPanel(new BorderLayout(4, 2));
-        p.setOpaque(false);
-        JLabel lbl = new JLabel(name + ":");
-        lbl.setForeground(new Color(150, 160, 175));
-        lbl.setFont(MONO_BOLD);
-        p.add(lbl, BorderLayout.NORTH);
-
-        JTextField tf = new JTextField("0000");
-        tf.setEditable(false);
-        tf.setBackground(new Color(24, 26, 32));
-        tf.setForeground(TEXT_COLOR);
-        tf.setFont(MONO_BOLD);
-        tf.setHorizontalAlignment(JTextField.CENTER);
-        tf.setBorder(BorderFactory.createLineBorder(new Color(60, 65, 78)));
-        regFields.put(name, tf);
-        p.add(tf, BorderLayout.CENTER);
-        return p;
-    }
-
-    private JLabel createFlagBadge(String name) {
-        JLabel lbl = new JLabel(name, SwingConstants.CENTER);
-        lbl.setOpaque(true);
-        lbl.setBackground(FLAG_OFF_BG);
-        lbl.setForeground(new Color(180, 185, 195));
-        lbl.setFont(MONO_BOLD);
-        lbl.setBorder(BorderFactory.createLineBorder(new Color(50, 54, 64)));
-        flagLabels.put(name, lbl);
-        return lbl;
-    }
-
-    private TitledBorder createTitledBorder(String title) {
-        TitledBorder b = BorderFactory.createTitledBorder(
-                BorderFactory.createLineBorder(new Color(55, 60, 72)), title);
-        b.setTitleColor(ACCENT_COLOR);
-        b.setTitleFont(new Font("SansSerif", Font.BOLD, 12));
-        return b;
+    private TitledBorder createPanelHeader(String title) {
+        TitledBorder tb = BorderFactory.createTitledBorder(
+                BorderFactory.createLineBorder(new Color(200, 205, 215)), title);
+        tb.setTitleFont(new Font("SansSerif", Font.BOLD, 12));
+        tb.setTitleColor(new Color(60, 65, 75));
+        return tb;
     }
 
     private void updateWarriorList() {
@@ -284,11 +307,11 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
         warriorSelector.removeAllItems();
         for (int i = 0; i < war.getNumWarriors(); i++) {
             Warrior w = war.getWarrior(i);
-            warriorSelector.addItem(w.getName() + (w.isAlive() ? "" : " [DEAD]"));
+            warriorSelector.addItem(w.getName());
         }
         if (curSelected != null) {
             for (int i = 0; i < warriorSelector.getItemCount(); i++) {
-                if (warriorSelector.getItemAt(i).startsWith(curSelected)) {
+                if (warriorSelector.getItemAt(i).equals(curSelected)) {
                     warriorSelector.setSelectedIndex(i);
                     break;
                 }
@@ -308,15 +331,13 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
 
     private void doStep() {
         War war = competition.getCurrentWar();
-        if (war == null) {
-            lblStatus.setText(" No active war. Click 'Start!' in the main window.");
-            return;
-        }
+        if (war == null) return;
         if (!war.isPaused()) {
             war.pause();
         }
+        stepCount++;
+        lblStepCounter.setText("Step: " + stepCount);
         war.runSingleRound();
-        // Give the simulation thread a few milliseconds to process the single round, then refresh
         new Thread(() -> {
             try {
                 Thread.sleep(60);
@@ -327,18 +348,13 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
 
     private void togglePause() {
         War war = competition.getCurrentWar();
-        if (war == null) {
-            lblStatus.setText(" No active war. Click 'Start!' in the main window.");
-            return;
-        }
+        if (war == null) return;
         if (war.isPaused()) {
             war.resume();
-            btnPauseResume.setText("Pause");
-            lblStatus.setText(" Simulation resumed.");
+            btnResumePause.setText("Pause");
         } else {
             war.pause();
-            btnPauseResume.setText("Resume");
-            lblStatus.setText(" Simulation paused.");
+            btnResumePause.setText("Resume");
             refreshState();
         }
     }
@@ -346,27 +362,17 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
     public void refreshState() {
         SwingUtilities.invokeLater(() -> {
             War war = competition.getCurrentWar();
-            if (war == null) {
-                lblStatus.setText(" No active war session");
-                return;
-            }
+            if (war == null) return;
 
-            if (war.isPaused()) {
-                btnPauseResume.setText("Resume");
-            } else {
-                btnPauseResume.setText("Pause");
-            }
+            Warrior w = getSelectedWarrior();
+            if (w == null) return;
 
-            Warrior warrior = getSelectedWarrior();
-            if (warrior == null) return;
-
-            CpuState s = warrior.getCpuState();
+            CpuState s = w.getCpuState();
             RealModeMemory mem = war.getMemory();
 
-            lblStatus.setText(String.format(" Warrior: %s  |  State: %s  |  Arena Segment: 0x%04X",
-                    warrior.getName(), warrior.isAlive() ? "ALIVE" : "DEAD", War.ARENA_SEGMENT));
+            btnResumePause.setText(war.isPaused() ? "Resume" : "Pause");
 
-            // Update Registers with change highlights
+            // Update Registers
             updateReg("AX", s.getAX());
             updateReg("BX", s.getBX());
             updateReg("CX", s.getCX());
@@ -378,83 +384,75 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
             updateReg("CS", s.getCS());
             updateReg("IP", s.getIP());
             updateReg("DS", s.getDS());
-            updateReg("ES", s.getES());
             updateReg("SS", s.getSS());
+            updateReg("ES", s.getES());
             updateReg("Energy", s.getEnergy());
+            updateReg("Flags", s.getFlags());
 
             // Update Flags
-            updateFlag("CF", s.getCarryFlag());
-            updateFlag("ZF", s.getZeroFlag());
-            updateFlag("SF", s.getSignFlag());
-            updateFlag("OF", s.getOverflowFlag());
-            updateFlag("PF", s.getParityFlag());
-            updateFlag("AF", s.getAuxFlag());
-            updateFlag("DF", s.getDirectionFlag());
-            updateFlag("IF", s.getInterruptFlag());
-            updateFlag("TF", s.getTrapFlag());
+            flagBoxes.get("OF").setSelected(s.getOverflowFlag());
+            flagBoxes.get("DF").setSelected(s.getDirectionFlag());
+            flagBoxes.get("IF").setSelected(s.getInterruptFlag());
+            flagBoxes.get("TF").setSelected(s.getTrapFlag());
+            flagBoxes.get("SF").setSelected(s.getSignFlag());
+            flagBoxes.get("ZF").setSelected(s.getZeroFlag());
+            flagBoxes.get("AF").setSelected(s.getAuxFlag());
+            flagBoxes.get("PF").setSelected(s.getParityFlag());
+            flagBoxes.get("CF").setSelected(s.getCarryFlag());
 
-            // Disassemble instructions around CS:IP
-            renderDisassembly(mem, s.getCS(), s.getIP());
+            // Render Disassembly
+            short baseOffset = (customViewOffset != -1) ? (short) customViewOffset : s.getIP();
+            renderDisassembly(mem, s.getCS(), baseOffset, s.getIP());
 
             // Render Stack
             renderStack(mem, s.getSS(), s.getSP());
+
+            // Render Shared Memory
+            renderShared(mem, s.getES());
+
+            // Update Watch
+            renderWatch(mem);
+
+            // Update Arena Map
+            arenaMapView.updateArena(mem, w);
         });
     }
 
     private void updateReg(String name, short val) {
         JTextField tf = regFields.get(name);
         if (tf == null) return;
-        String text = String.format("%04X", val & 0xFFFF);
-        Short prev = previousRegValues.get(name);
+        tf.setText(String.format("%04X", val & 0xFFFF));
+        Short prev = prevRegs.get(name);
         if (prev != null && prev != val) {
-            tf.setForeground(HIGHLIGHT_CHANGED);
+            tf.setBackground(new Color(255, 235, 175));
         } else {
-            tf.setForeground(TEXT_COLOR);
+            tf.setBackground(new Color(250, 250, 252));
         }
-        previousRegValues.put(name, val);
-        tf.setText(text);
+        prevRegs.put(name, val);
     }
 
-    private void updateFlag(String name, boolean on) {
-        JLabel l = flagLabels.get(name);
-        if (l == null) return;
-        if (on) {
-            l.setBackground(FLAG_ON_BG);
-            l.setForeground(Color.WHITE);
-            l.setText(name + " [1]");
-        } else {
-            l.setBackground(FLAG_OFF_BG);
-            l.setForeground(new Color(150, 155, 165));
-            l.setText(name + " [0]");
-        }
-    }
-
-    private void renderDisassembly(RealModeMemory mem, short cs, short ip) {
-        // Disassemble 14 instructions starting from current IP
-        List<Disassembler.DecodedInstruction> instrs = Disassembler.disassembleMemory(mem, cs, ip, 14);
+    private void renderDisassembly(RealModeMemory mem, short cs, short startOffset, short currentIP) {
+        List<Disassembler.DecodedInstruction> instrs =
+                Disassembler.disassembleMemory(mem, cs, startOffset, 16);
 
         StringBuilder html = new StringBuilder();
-        html.append("<html><body style='font-family:Consolas,monospace; font-size:11px; background-color:#14161a; color:#dce0e8; padding:6px;'>");
+        html.append("<html><body style='font-family:Consolas,monospace; font-size:12px; margin:2px;'>");
 
-        boolean isFirst = true;
         for (Disassembler.DecodedInstruction di : instrs) {
-            if (isFirst) {
-                // Highlight current instruction
-                html.append(String.format(
-                        "<div style='background-color:#1e3a5f; color:#ffdd57; padding:2px; font-weight:bold;'>" +
-                                "<span style='color:#61afef;'>%04X:%04X</span> &nbsp;&nbsp;" +
-                                "<span style='color:#abb2bf;'>%-10s</span> &nbsp;&nbsp;" +
-                                "<span style='color:#98c379;'>%s</span> &nbsp;&nbsp;&nbsp;&larr; [IP]</div>",
-                        cs & 0xFFFF, di.offset, di.hexBytes, di.text));
-                isFirst = false;
-            } else {
-                html.append(String.format(
-                        "<div style='padding:2px;'>" +
-                                "<span style='color:#5c6370;'>%04X:%04X</span> &nbsp;&nbsp;" +
-                                "<span style='color:#5c6370;'>%-10s</span> &nbsp;&nbsp;" +
-                                "<span style='color:#e5c07b;'>%s</span></div>",
-                        cs & 0xFFFF, di.offset, di.hexBytes, di.text));
+            boolean isCur = (di.offset == (currentIP & 0xFFFF));
+            String bg = isCur ? "background-color:#d0e4fe; font-weight:bold;" : "";
+            boolean isTrap = di.text.toLowerCase().contains("int 3") || di.text.startsWith("DB 0xCC");
+            String color = isTrap ? "color:#999999;" : "color:#000000;";
+
+            html.append(String.format(
+                    "<div style='%s padding:1px;'>", bg));
+            html.append(String.format("<span style='color:#003366;'>%04X</span>&nbsp;&nbsp;", di.offset));
+            html.append(String.format("<span style='color:#555555;'>%-10s</span>&nbsp;&nbsp;", di.hexBytes));
+            html.append(String.format("<span style='%s'>%s</span>", color, di.text));
+            if (isCur) {
+                html.append("&nbsp;&nbsp;<span style='color:#0055bb;'>&larr; IP</span>");
             }
+            html.append("</div>");
         }
         html.append("</body></html>");
         codePane.setText(html.toString());
@@ -463,28 +461,57 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
 
     private void renderStack(RealModeMemory mem, short ss, short sp) {
         StringBuilder sb = new StringBuilder();
-        int baseSp = sp & 0xFFFF;
-        sb.append(String.format("SS:SP = %04X:%04X\n", ss & 0xFFFF, baseSp));
-        sb.append("--------------------------------------------------\n");
+        int base = sp & 0xFFFF;
+        int linearBase = (Unsigned.unsignedShort(ss) * 16) + base;
 
-        for (int i = 0; i < 8; i++) {
-            short curOffset = (short) (baseSp + (i * 2));
+        for (int i = -2; i <= 6; i++) {
+            int off = base + (i * 2);
+            int lin = linearBase + (i * 2);
             try {
-                short val = mem.readWord(new RealModeAddress(ss, curOffset));
-                sb.append(String.format("[%04X:%04X]  ->  %04X", ss & 0xFFFF, curOffset & 0xFFFF, val & 0xFFFF));
-                if (i == 0) sb.append("  <-- TOP OF STACK");
-                sb.append("\n");
+                short val = mem.readWord(new RealModeAddress(ss, (short) off));
+                int low = val & 0xFF;
+                int high = (val >> 8) & 0xFF;
+                String marker = (i == 0) ? " <=" : "";
+                sb.append(String.format("%05X  %02X %02X%s\n", lin & 0xFFFFF, low, high, marker));
             } catch (Exception e) {
-                sb.append(String.format("[%04X:%04X]  ->  <error>\n", ss & 0xFFFF, curOffset & 0xFFFF));
+                sb.append(String.format("%05X  -- --\n", lin & 0xFFFFF));
             }
         }
         stackArea.setText(sb.toString());
-        stackArea.setCaretPosition(0);
+    }
+
+    private void renderShared(RealModeMemory mem, short es) {
+        StringBuilder sb = new StringBuilder();
+        int lin = Unsigned.unsignedShort(es) * 16;
+        for (int i = 0; i < 8; i++) {
+            int addr = lin + (i * 2);
+            try {
+                short val = mem.readWord(new RealModeAddress(es, (short) (i * 2)));
+                sb.append(String.format("%05X  %02X %02X\n", addr & 0xFFFFF, val & 0xFF, (val >> 8) & 0xFF));
+            } catch (Exception e) {
+                sb.append(String.format("%05X  -- --\n", addr & 0xFFFFF));
+            }
+        }
+        sharedArea.setText(sb.toString());
+    }
+
+    private void renderWatch(RealModeMemory mem) {
+        for (int row = 0; row < watchModel.getRowCount(); row++) {
+            String addrStr = (String) watchModel.getValueAt(row, 0);
+            try {
+                int addr = Integer.parseInt(addrStr, 16);
+                short val = mem.readWord(new RealModeAddress(addr));
+                watchModel.setValueAt(String.format("%04X", val & 0xFFFF), row, 1);
+            } catch (Exception e) {
+                watchModel.setValueAt("ERR", row, 1);
+            }
+        }
     }
 
     @Override
     public void onWarStart(long seed) {
         SwingUtilities.invokeLater(() -> {
+            stepCount = 0;
             updateWarriorList();
             refreshState();
         });
@@ -496,8 +523,7 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
     }
 
     @Override
-    public void onRound(int round) {
-    }
+    public void onRound(int round) {}
 
     @Override
     public void onWarriorBirth(String warriorName) {
@@ -510,12 +536,10 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
     }
 
     @Override
-    public void onCompetitionStart() {
-    }
+    public void onCompetitionStart() {}
 
     @Override
-    public void onCompetitionEnd() {
-    }
+    public void onCompetitionEnd() {}
 
     @Override
     public void onEndRound() {
