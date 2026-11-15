@@ -308,23 +308,38 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
 
     private void doStep() {
         War war = competition.getCurrentWar();
-        if (war == null) return;
+        if (war == null) {
+            lblStatus.setText(" No active war. Click 'Start!' in the main window.");
+            return;
+        }
         if (!war.isPaused()) {
             war.pause();
         }
         war.runSingleRound();
-        refreshState();
+        // Give the simulation thread a few milliseconds to process the single round, then refresh
+        new Thread(() -> {
+            try {
+                Thread.sleep(60);
+            } catch (InterruptedException ignored) {}
+            SwingUtilities.invokeLater(this::refreshState);
+        }).start();
     }
 
     private void togglePause() {
         War war = competition.getCurrentWar();
-        if (war == null) return;
+        if (war == null) {
+            lblStatus.setText(" No active war. Click 'Start!' in the main window.");
+            return;
+        }
         if (war.isPaused()) {
             war.resume();
             btnPauseResume.setText("Pause");
+            lblStatus.setText(" Simulation resumed.");
         } else {
             war.pause();
             btnPauseResume.setText("Resume");
+            lblStatus.setText(" Simulation paused.");
+            refreshState();
         }
     }
 

@@ -415,8 +415,8 @@ public class War {
     
     private Random rand = new Random();
     
-    private boolean isSingleRound;
-    private boolean isPaused;
+    private volatile boolean isSingleRound;
+    private volatile boolean isPaused;
     
     public void setSeed(long seed){
     	rand.setSeed(seed);

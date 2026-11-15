@@ -150,21 +150,27 @@ public class WarFrame extends JFrame
 		btnPause = new JButton("Pause");
 		btnPause.setEnabled(false);
 		btnPause.addActionListener(event -> {
-            if (competition.getCurrentWar().isPaused()) {
-                competition.getCurrentWar().resume();
+            War war = competition.getCurrentWar();
+            if (war == null) return;
+            if (war.isPaused()) {
+                war.resume();
                 btnPause.setText("Pause");
                 btnSingleRound.setEnabled(false);
             } else {
-                competition.getCurrentWar().pause();
+                war.pause();
                 btnPause.setText("Resume");
                 btnSingleRound.setEnabled(true);
             }
-
         });
 
 		btnSingleRound = new JButton("Single Round");
 		btnSingleRound.setEnabled(false);
-		btnSingleRound.addActionListener(event -> competition.getCurrentWar().runSingleRound());
+		btnSingleRound.addActionListener(event -> {
+            War war = competition.getCurrentWar();
+            if (war != null) {
+                war.runSingleRound();
+            }
+        });
         
 		buttonPanel.add(btnCpuState);
 		buttonPanel.add(btnPause);

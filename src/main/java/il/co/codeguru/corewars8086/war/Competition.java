@@ -194,11 +194,17 @@ public class Competition {
       competitionEventListener.onRound(round);
       competitionEventListener.onEndRound();
       
-     if (selectedAsCurrent && speed != MAXIMUM_SPEED) {
-       if (round % speed == 0) {
-         Thread.sleep(DELAY_UNIT);
-       }
-     }
+      if (selectedAsCurrent) {
+        if (speed != MAXIMUM_SPEED && (round % speed == 0)) {
+          Thread.sleep(DELAY_UNIT);
+        }
+        while (war.isPaused()) {
+          Thread.sleep(DELAY_UNIT);
+        }
+        if (war.isSingleRound()) {
+          war.pause();
+        }
+      }
       
       if (war.isOver()) {
         break;
@@ -210,6 +216,11 @@ public class Competition {
     
     competitionEventListener.onRound(round);
     
+    synchronized (this) {
+      if (selectedAsCurrent) {
+        this.currentWar = null;
+      }
+    }
     int numAlive = war.getNumRemainingSurvivors();
     String names = war.getRemainingWarriorNames();
     
