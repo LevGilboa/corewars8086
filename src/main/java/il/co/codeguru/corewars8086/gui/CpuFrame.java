@@ -67,6 +67,7 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
         refreshState();
 
         this.competition.addCompetitionEventListener(this);
+        setVisible(true);
     }
 
     private void initComponents() {

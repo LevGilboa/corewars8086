@@ -137,8 +137,12 @@ public class WarFrame extends JFrame
 		btnCpuState = new JButton("View CPU");
 		btnCpuState.setEnabled(false);
 		btnCpuState.addActionListener(event -> {
-            cpuFrame = new CpuFrame(competition);
-            WarFrame.this.competition.addCompetitionEventListener(cpuFrame);
+            if (cpuFrame == null || !cpuFrame.isDisplayable()) {
+                cpuFrame = new CpuFrame(competition);
+            }
+            cpuFrame.setVisible(true);
+            cpuFrame.toFront();
+            cpuFrame.refreshState();
         });
 
 		competition.addCompetitionEventListener(this);
