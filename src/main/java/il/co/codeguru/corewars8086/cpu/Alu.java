@@ -59,26 +59,36 @@ final class Alu {
         m_state.setZeroFlag(value == 0);
     }	
 
+    /** Carry flag as 0/1, for add-with-carry / subtract-with-borrow. */
+    private int carry() {
+        return m_state.getCarryFlag() ? 1 : 0;
+    }
+
+    /** Updates the flags from a wide 8bit-operation result and returns its low byte. */
+    private byte finish8(int wideResult) {
+        short result16 = (short)wideResult;
+        updateFlags8(result16);
+        return (byte)result16;
+    }
+
+    /** Updates the flags from a wide 16bit-operation result and returns its low word. */
+    private short finish16(int wideResult) {
+        updateFlags16(wideResult);
+        return (short)wideResult;
+    }
+
     /**
      * Adds two 8bit values, updates the flags and returns the result.
      */
     byte add8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) + Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
+        return finish8(Unsigned.unsignedByte(value1) + Unsigned.unsignedByte(value2));
     }
 
     /**
      * Adds two 16bit values, updates the flags and returns the result.
      */
     short add16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) + Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
+        return finish16(Unsigned.unsignedShort(value1) + Unsigned.unsignedShort(value2));
     }
 
     /**
@@ -129,22 +139,14 @@ final class Alu {
      * ORs two 8bit values, updates the flags and returns the result.
      */
     byte or8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) | Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
+        return finish8(Unsigned.unsignedByte(value1) | Unsigned.unsignedByte(value2));
     }
 
     /**
      * ORs two 16bit values, updates the flags and returns the result.
      */
     short or16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) | Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
+        return finish16(Unsigned.unsignedShort(value1) | Unsigned.unsignedShort(value2));
     }
 
     /**
@@ -152,14 +154,7 @@ final class Alu {
      * the result.
      */
     byte adc8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) + Unsigned.unsignedByte(value2));
-        if (m_state.getCarryFlag()) {
-            ++result16;
-        }
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
+        return finish8(Unsigned.unsignedByte(value1) + Unsigned.unsignedByte(value2) + carry());
     }
 
     /**
@@ -167,29 +162,15 @@ final class Alu {
      * the result.
      */
     short adc16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) + Unsigned.unsignedShort(value2);
-        if (m_state.getCarryFlag()) {
-            ++result32;
-        }
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }	
+        return finish16(Unsigned.unsignedShort(value1) + Unsigned.unsignedShort(value2) + carry());
+    }
 
     /**
      * Subtracts a given 8bit value with the sum of a second 8bit value and the
      * carry flag, updates the flags and returns the result.
      */
     byte sbb8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) - Unsigned.unsignedByte(value2));
-        if (m_state.getCarryFlag()) {
-            --result16;
-        }
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
+        return finish8(Unsigned.unsignedByte(value1) - Unsigned.unsignedByte(value2) - carry());
     }
 
     /**
@@ -197,80 +178,49 @@ final class Alu {
      * carry flag, updates the flags and returns the result.
      */
     short sbb16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) - Unsigned.unsignedShort(value2);
-        if (m_state.getCarryFlag()) {
-            --result32;
-        }
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
+        return finish16(Unsigned.unsignedShort(value1) - Unsigned.unsignedShort(value2) - carry());
     }
 
     /**
      * ANDs two 8bit values, updates the flags and returns the result.
      */
     byte and8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) & Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
+        return finish8(Unsigned.unsignedByte(value1) & Unsigned.unsignedByte(value2));
     }
 
     /**
      * ANDs two 16bit values, updates the flags and returns the result.
      */
     short and16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) & Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }	
+        return finish16(Unsigned.unsignedShort(value1) & Unsigned.unsignedShort(value2));
+    }
 
     /**
      * Subtracts two 8bit values, updates the flags and returns the result.
      */
     byte sub8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) - Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
+        return finish8(Unsigned.unsignedByte(value1) - Unsigned.unsignedByte(value2));
     }
 
     /**
      * Subtracts two 16bit values, updates the flags and returns the result.
      */
     short sub16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) - Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
+        return finish16(Unsigned.unsignedShort(value1) - Unsigned.unsignedShort(value2));
     }
 
     /**
      * XORs two 8bit values, updates the flags and returns the result.
      */
     byte xor8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) ^ Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
+        return finish8(Unsigned.unsignedByte(value1) ^ Unsigned.unsignedByte(value2));
     }
 
     /**
      * XORs two 16bit values, updates the flags and returns the result.
      */
     short xor16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) ^ Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
+        return finish16(Unsigned.unsignedShort(value1) ^ Unsigned.unsignedShort(value2));
     }
 
 
