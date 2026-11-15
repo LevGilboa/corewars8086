@@ -135,6 +135,15 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
         topBar.add(Box.createHorizontalStrut(6));
         topBar.add(lblStepCounter);
 
+        JButton btnOpenEditor = new JButton("Code Editor");
+        btnOpenEditor.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        btnOpenEditor.addActionListener(e -> {
+            WarriorEditorFrame editor = new WarriorEditorFrame(competition);
+            editor.setVisible(true);
+        });
+        topBar.add(Box.createHorizontalStrut(4));
+        topBar.add(btnOpenEditor);
+
         col.add(topBar, BorderLayout.NORTH);
 
         // Code Disassembly Box with Interactive Micro-Step Tooltip Inspection

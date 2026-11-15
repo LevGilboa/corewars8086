@@ -171,7 +171,14 @@ public class WarFrame extends JFrame
                 war.runSingleRound();
             }
         });
+
+		JButton btnWarriorEditor = new JButton("Warrior Editor");
+		btnWarriorEditor.addActionListener(event -> {
+			WarriorEditorFrame editor = new WarriorEditorFrame(competition);
+			editor.setVisible(true);
+		});
         
+		buttonPanel.add(btnWarriorEditor);
 		buttonPanel.add(btnCpuState);
 		buttonPanel.add(btnPause);
 		buttonPanel.add(btnSingleRound);
