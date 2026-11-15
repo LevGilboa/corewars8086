@@ -36,10 +36,10 @@ public class WarFrame extends JFrame
     private JTextArea messagesArea;
 
     /** list of warrior names */
-    private JList nameList;
+    private JList<WarriorInfo> nameList;
 
     /** Model for the name list */
-    private DefaultListModel nameListModel;
+    private DefaultListModel<WarriorInfo> nameListModel;
 
     /** Holds the current round number */
     private int nRoundNumber;
@@ -58,6 +58,10 @@ public class WarFrame extends JFrame
     private JSlider speedSlider;
 
     private final Competition competition;
+
+    /** Linear address of the first / one-past-last byte of the arena. */
+    private static final int ARENA_START = War.ARENA_SEGMENT * RealModeAddress.PARAGRAPH_SIZE;
+    private static final int ARENA_END = 2 * ARENA_START;
 
 	private MemoryFrame memoryFrame;
 	
@@ -166,8 +170,8 @@ public class WarFrame extends JFrame
         // build warrior zone (warrior list + title) 
         JPanel warriorZone = new JPanel(new BorderLayout());
         warriorZone.setBackground(Color.BLACK);
-        nameListModel = new DefaultListModel();
-        nameList = new JList(nameListModel);
+        nameListModel = new DefaultListModel<>();
+        nameList = new JList<>(nameListModel);
         nameList.setPreferredSize(new Dimension(200,0));
         nameList.setCellRenderer(new NameCellRenderer());
         nameList.setOpaque(false);
@@ -180,7 +184,6 @@ public class WarFrame extends JFrame
         warriorZone.add(Box.createHorizontalStrut(20), BorderLayout.WEST);
         mainPanel.add(warriorZone, BorderLayout.EAST);
 
-        setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         getContentPane().setBackground(Color.BLACK);
         getContentPane().add(mainPanel, BorderLayout.CENTER);
         //getContentPane().add(new JLabel(new ImageIcon("images/title2.png")), BorderLayout.EAST);
@@ -193,11 +196,8 @@ public class WarFrame extends JFrame
     /** Add a message to the message zone */
     public void addMessage(String message) {
         messagesArea.append(message + "\n");
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                messagesArea.setCaretPosition(messagesArea.getDocument().getLength());
-            }
-        });
+        SwingUtilities.invokeLater(
+            () -> messagesArea.setCaretPosition(messagesArea.getDocument().getLength()));
     }
 
     /** Add a message to the message zone (with round number) */
@@ -207,9 +207,9 @@ public class WarFrame extends JFrame
 
     /** @see MemoryEventListener#onMemoryWrite(RealModeAddress) */
     public void onMemoryWrite(RealModeAddress address) {
-		int ipInsideArena = address.getLinearAddress() - 0x1000 *0x10; // arena * paragraph
+		int ipInsideArena = address.getLinearAddress() - ARENA_START;
 		
-        if ( address.getLinearAddress() >= War.ARENA_SEGMENT*0x10 && address.getLinearAddress() < 2*War.ARENA_SEGMENT*0x10 ) {
+        if (address.getLinearAddress() >= ARENA_START && address.getLinearAddress() < ARENA_END) {
         	warCanvas.paintPixel(
         			Unsigned.unsignedShort(ipInsideArena),
         			(byte)competition.getCurrentWarrior());
@@ -277,9 +277,9 @@ public class WarFrame extends JFrame
     /** @see CompetitionEventListener#onWarriorDeath(String) */
     public void onWarriorDeath(String warriorName, String reason) {
         addMessage(nRoundNumber, warriorName + " died due to " + reason + ".");
-        Enumeration namesListElements = nameListModel.elements();
+        Enumeration<WarriorInfo> namesListElements = nameListModel.elements();
         while(namesListElements.hasMoreElements()) {
-            WarriorInfo info = (WarriorInfo) namesListElements.nextElement();
+            WarriorInfo info = namesListElements.nextElement();
             if (info.name.equals(warriorName)) {
                 info.alive = false;
                 break;
@@ -287,11 +287,7 @@ public class WarFrame extends JFrame
         }
 
         // a bit bogus... just to make the list refresh and show the new status.
-        SwingUtilities.invokeLater(new Runnable() {
-            public void run() {
-                nameList.repaint();
-            }
-        });
+        SwingUtilities.invokeLater(nameList::repaint);
         
         effectsHandler.onWarriorDeath(warriorName);
     }	
@@ -301,7 +297,7 @@ public class WarFrame extends JFrame
      * Paints each warrior with its color and uses <S>strikeout</S> to show
      * dead warriors.
      */
-    class NameCellRenderer extends JLabel implements ListCellRenderer {
+    class NameCellRenderer extends JLabel implements ListCellRenderer<WarriorInfo> {
 		private static final long serialVersionUID = 1L;
 		
 		private static final int FONT_SIZE = 20;
@@ -317,9 +313,8 @@ public class WarFrame extends JFrame
         /**
          * @see javax.swing.ListCellRenderer#getListCellRendererComponent(javax.swing.JList, java.lang.Object, int, boolean, boolean)
          */
-        public Component getListCellRendererComponent(JList list, Object value,
+        public Component getListCellRendererComponent(JList<? extends WarriorInfo> list, WarriorInfo info,
             int index, boolean isSelected, boolean cellHasFocus) {
-            WarriorInfo info = (WarriorInfo)value;
             /*
             float warriorScore = m_warSession.m_scoreBoard.getScore(warriorName);
             warriorScore = (float)((int)(warriorScore * 100)) / 100;
@@ -375,7 +370,7 @@ public class WarFrame extends JFrame
 				short ip = this.competition.getCurrentWar().getWarrior(i).getCpuState().getIP();
 				short cs = this.competition.getCurrentWar().getWarrior(i).getCpuState().getCS();
 				
-				int ipInsideArena = new RealModeAddress(cs, ip).getLinearAddress() - 0x10000;
+				int ipInsideArena = new RealModeAddress(cs, ip).getLinearAddress() - ARENA_START;
 				
 				this.warCanvas.paintPointer((char) ipInsideArena,(byte) i);
 			}
@@ -396,9 +391,8 @@ public class WarFrame extends JFrame
 		this.competition.removeMemoryEventLister(this);
 		this.competition.getCurrentWar().resume();
 
-		try {
-			this.cpuFrame.dispose();
-		} catch (Exception e) {
+		if (cpuFrame != null) {
+			cpuFrame.dispose();
 		}
 		
 		// Clean up canvas resources (stop animation timer)
