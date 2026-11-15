@@ -431,26 +431,27 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
         prevRegs.put(name, val);
     }
 
-    private void renderDisassembly(RealModeMemory mem, short cs, short startOffset, short currentIP) {
+    private void renderDisassembly(RealModeMemory mem, short cs, short targetOffset, short currentIP) {
+        // Disassemble 6 instructions before target, current instruction in middle, and 8 instructions after
         List<Disassembler.DecodedInstruction> instrs =
-                Disassembler.disassembleMemory(mem, cs, startOffset, 16);
+                Disassembler.disassembleCentered(mem, cs, targetOffset, 6, 8);
 
         StringBuilder html = new StringBuilder();
         html.append("<html><body style='font-family:Consolas,monospace; font-size:12px; margin:2px;'>");
 
         for (Disassembler.DecodedInstruction di : instrs) {
             boolean isCur = (di.offset == (currentIP & 0xFFFF));
-            String bg = isCur ? "background-color:#d0e4fe; font-weight:bold;" : "";
+            String bg = isCur ? "background-color:#c8e1ff; border:1px solid #7baaf7; font-weight:bold;" : "";
             boolean isTrap = di.text.toLowerCase().contains("int 3") || di.text.startsWith("DB 0xCC");
-            String color = isTrap ? "color:#999999;" : "color:#000000;";
+            String color = isCur ? "color:#002266;" : (isTrap ? "color:#999999;" : "color:#111111;");
 
             html.append(String.format(
-                    "<div style='%s padding:1px;'>", bg));
-            html.append(String.format("<span style='color:#003366;'>%04X</span>&nbsp;&nbsp;", di.offset));
-            html.append(String.format("<span style='color:#555555;'>%-10s</span>&nbsp;&nbsp;", di.hexBytes));
+                    "<div style='%s padding:2px;'>", bg));
+            html.append(String.format("<span style='color:#003366; font-weight:%s;'>%04X</span>&nbsp;&nbsp;", isCur ? "bold" : "normal", di.offset));
+            html.append(String.format("<span style='color:#666666;'>%-10s</span>&nbsp;&nbsp;", di.hexBytes));
             html.append(String.format("<span style='%s'>%s</span>", color, di.text));
             if (isCur) {
-                html.append("&nbsp;&nbsp;<span style='color:#0055bb;'>&larr; IP</span>");
+                html.append("&nbsp;&nbsp;<span style='color:#0044aa; font-weight:bold;'>&larr; [NEXT OP]</span>");
             }
             html.append("</div>");
         }

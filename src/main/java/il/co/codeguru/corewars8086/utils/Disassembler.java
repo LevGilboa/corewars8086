@@ -56,6 +56,66 @@ public class Disassembler {
     /**
      * Disassembles a block of instructions from memory around a given segment:offset.
      */
+    /**
+     * Disassembles a window of instructions centered on targetOffset:
+     * attempts to find valid instructions immediately before targetOffset,
+     * includes targetOffset in the middle, and decodes instructions after targetOffset.
+     */
+    public static List<DecodedInstruction> disassembleCentered(RealModeMemory memory, short segment, short targetOffset, int beforeCount, int afterCount) {
+        List<DecodedInstruction> beforeList = new ArrayList<>();
+        int target = targetOffset & 0xFFFF;
+
+        // Try candidate start offsets before target (from 24 down to 2 bytes prior)
+        // to find an instruction boundary that aligns cleanly with target
+        for (int backBytes = Math.min(24, target); backBytes >= 2; backBytes--) {
+            int candidateOffset = (target - backBytes) & 0xFFFF;
+            List<DecodedInstruction> candidateList = new ArrayList<>();
+            int cur = candidateOffset;
+            boolean aligned = false;
+            while (cur < target && candidateList.size() < 12) {
+                byte[] buf = readAhead(memory, segment, (short) cur, 15);
+                DecodedInstruction di = decodeOne(buf, 0, cur);
+                candidateList.add(di);
+                cur += di.length;
+                if (cur == target) {
+                    aligned = true;
+                    break;
+                }
+            }
+            if (aligned) {
+                // Take the last `beforeCount` instructions
+                int startIdx = Math.max(0, candidateList.size() - beforeCount);
+                beforeList.addAll(candidateList.subList(startIdx, candidateList.size()));
+                break;
+            }
+        }
+
+        List<DecodedInstruction> fullList = new ArrayList<>(beforeList);
+
+        // Current instruction + after instructions
+        int cur = target;
+        for (int i = 0; i <= afterCount; i++) {
+            byte[] buf = readAhead(memory, segment, (short) cur, 15);
+            DecodedInstruction di = decodeOne(buf, 0, cur);
+            fullList.add(di);
+            cur = (cur + di.length) & 0xFFFF;
+        }
+
+        return fullList;
+    }
+
+    private static byte[] readAhead(RealModeMemory memory, short segment, short offset, int len) {
+        byte[] buf = new byte[len];
+        for (int b = 0; b < len; b++) {
+            try {
+                buf[b] = memory.readByte(new RealModeAddress(segment, (short) (offset + b)));
+            } catch (Exception e) {
+                buf[b] = (byte) 0x90;
+            }
+        }
+        return buf;
+    }
+
     public static List<DecodedInstruction> disassembleMemory(RealModeMemory memory, short segment, short startOffset, int count) {
         List<DecodedInstruction> result = new ArrayList<>();
         short curOffset = startOffset;
