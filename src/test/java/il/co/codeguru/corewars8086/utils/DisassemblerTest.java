@@ -49,6 +49,24 @@ public class DisassemblerTest {
     }
 
     @Test
+    public void testDisassembleCallFarDirect() {
+        // 9A 00 20 00 10 -> CALL FAR 0x1000:0x2000
+        byte[] bytes = new byte[]{(byte) 0x9A, (byte) 0x00, (byte) 0x20, (byte) 0x00, (byte) 0x10};
+        Disassembler.DecodedInstruction di = Disassembler.decodeOne(bytes, 0, 0x100);
+        assertEquals(5, di.length);
+        assertEquals("CALL FAR 0x1000:0x2000", di.text);
+    }
+
+    @Test
+    public void testDisassembleCallFarIndirect() {
+        // FF 1F -> CALL FAR [BX]
+        byte[] bytes = new byte[]{(byte) 0xFF, (byte) 0x1F};
+        Disassembler.DecodedInstruction di = Disassembler.decodeOne(bytes, 0, 0x100);
+        assertEquals(2, di.length);
+        assertEquals("CALL FAR WORD [BX]", di.text);
+    }
+
+    @Test
     public void testDisassembleCenteredWindow() {
         RealModeMemoryImpl mem = new RealModeMemoryImpl();
         // Write a sequence of NOPs and instructions around offset 0x100

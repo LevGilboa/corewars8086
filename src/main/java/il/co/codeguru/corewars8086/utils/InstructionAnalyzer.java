@@ -104,10 +104,24 @@ public class InstructionAnalyzer {
             isWrite = false;
             label = String.format("CALL -> 0x%04X", target);
         } else if (text.startsWith("CALL FAR") || (buf[0] == (byte) 0x9A)) {
-            int target = parseHexTarget(text);
-            targetOffset = target;
+            int target = 0;
+            int targetSeg = 0;
+            if (buf[0] == (byte) 0x9A) {
+                target = (buf[1] & 0xFF) | ((buf[2] & 0xFF) << 8);
+                targetSeg = (buf[3] & 0xFF) | ((buf[4] & 0xFF) << 8);
+            } else if (text.contains(":")) {
+                int colon = text.indexOf(':');
+                targetSeg = parseHexTarget(text.substring(0, colon));
+                target = parseHexTarget(text.substring(colon + 1));
+            } else {
+                target = parseHexTarget(text);
+                targetSeg = s.getCS() & 0xFFFF;
+            }
+            if (targetSeg == War.ARENA_SEGMENT) {
+                targetOffset = target;
+            }
             isWrite = false;
-            label = String.format("CALL FAR -> 0x%04X", target);
+            label = String.format("CALL FAR -> %04X:%04X", targetSeg, target);
         } else if (text.startsWith("JMP 0x") || text.startsWith("JMP near") || text.startsWith("JMP short")) {
             int target = parseHexTarget(text);
             targetOffset = target;
@@ -162,6 +176,19 @@ public class InstructionAnalyzer {
         if (upper.startsWith("CALL FAR") || (di != null && di.text.startsWith("CALL FAR"))) {
             int curCs = (s != null) ? (s.getCS() & 0xFFFF) : 0x1000;
             int nextIp = (di != null && s != null) ? ((s.getIP() + di.length) & 0xFFFF) : 0;
+            String newCsStr = "operands";
+            String newIpStr = "operands";
+            if (upper.contains(":")) {
+                try {
+                    int colon = upper.indexOf(':');
+                    String p1 = upper.substring(upper.indexOf("FAR") + 3, colon).trim();
+                    String p2 = upper.substring(colon + 1).trim();
+                    int sVal = parseHexTarget(p1);
+                    int oVal = parseHexTarget(p2);
+                    newCsStr = String.format("0x%04X", sVal);
+                    newIpStr = String.format("0x%04X", oVal);
+                } catch (Exception ignored) {}
+            }
             html.append("<div style='color:#0b4f6c; font-weight:bold; margin-bottom:4px;'>Inter-Segment Subroutine Call (FAR)</div>");
             html.append("Executes a far subroutine call across segments by saving full context to the stack:");
             html.append("<ol style='margin:4px 0 6px 18px; padding:0;'>");
@@ -169,8 +196,8 @@ public class InstructionAnalyzer {
             html.append(String.format("<li><b>Push Code Segment:</b> <code>[SS:SP] = CS (0x%04X)</code></li>", curCs));
             html.append("<li><b>Decrement Stack Pointer:</b> <code>SP = SP - 2</code></li>");
             html.append(String.format("<li><b>Push Return Offset:</b> <code>[SS:SP] = IP + %d (0x%04X)</code></li>", di != null ? di.length : 5, nextIp));
-            html.append("<li><b>Update CS:</b> Load new Code Segment from instruction operands</li>");
-            html.append("<li><b>Update IP:</b> Load new Instruction Pointer from instruction operands</li>");
+            html.append(String.format("<li><b>Update CS:</b> Load new Code Segment: <code>CS = %s</code></li>", newCsStr));
+            html.append(String.format("<li><b>Update IP:</b> Load new Instruction Pointer: <code>IP = %s</code></li>", newIpStr));
             html.append("</ol>");
             html.append("<div style='font-size:10px; color:#555;'><i>Return with <code>RETF</code> to restore both CS and IP.</i></div>");
 

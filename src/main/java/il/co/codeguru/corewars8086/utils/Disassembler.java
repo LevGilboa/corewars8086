@@ -408,6 +408,12 @@ public class Disassembler {
 
             case 0x98: mnemonic = "CBW"; break;
             case 0x99: mnemonic = "CWD"; break;
+            case 0x9A: {
+                int off = r.u16();
+                int seg = r.u16();
+                mnemonic = String.format("CALL FAR 0x%04X:0x%04X", seg, off);
+                break;
+            }
             case 0x9B: mnemonic = "WAIT"; break;
             case 0x9C: mnemonic = "PUSHF"; break;
             case 0x9D: mnemonic = "POPF"; break;
@@ -510,9 +516,39 @@ public class Disassembler {
                 break;
             }
 
-            // RET / RETF
+            // RET / RETF / IRET
+            case 0xC2: mnemonic = String.format("RET 0x%04X", r.u16()); break;
             case 0xC3: mnemonic = "RET"; break;
+            case 0xCA: mnemonic = String.format("RETF 0x%04X", r.u16()); break;
             case 0xCB: mnemonic = "RETF"; break;
+            case 0xCF: mnemonic = "IRET"; break;
+
+            // Group 4 (INC/DEC r/m8): 0xFE
+            case 0xFE: {
+                ModRm m = ModRm.parse(r, false);
+                switch (m.reg) {
+                    case 0: mnemonic = "INC " + m.ea; break;
+                    case 1: mnemonic = "DEC " + m.ea; break;
+                    default: mnemonic = "GRP4 " + m.ea; break;
+                }
+                break;
+            }
+
+            // Group 5 (INC/DEC/CALL/JMP/PUSH r/m16): 0xFF
+            case 0xFF: {
+                ModRm m = ModRm.parse(r, true);
+                switch (m.reg) {
+                    case 0: mnemonic = "INC " + m.ea; break;
+                    case 1: mnemonic = "DEC " + m.ea; break;
+                    case 2: mnemonic = "CALL " + m.ea; break;
+                    case 3: mnemonic = "CALL FAR " + m.ea; break;
+                    case 4: mnemonic = "JMP " + m.ea; break;
+                    case 5: mnemonic = "JMP FAR " + m.ea; break;
+                    case 6: mnemonic = "PUSH " + m.ea; break;
+                    default: mnemonic = "GRP5 " + m.ea; break;
+                }
+                break;
+            }
 
             default:
                 mnemonic = String.format("DB 0x%02X", b);

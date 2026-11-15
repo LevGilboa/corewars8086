@@ -314,8 +314,12 @@ public class MiniAssembler {
                 return new byte[]{(byte) 0xEB, (byte) disp};
             }
             if (arg.startsWith("FAR ")) {
-                arg = arg.substring(4).trim();
-                String[] segOff = arg.split(":");
+                String targetPart = arg.substring(4).trim();
+                if (targetPart.contains("[")) {
+                    ModRM modrm = parseModRM(targetPart, isCall ? 3 : 5, symbols);
+                    return buildModRMInstruction((byte) 0xFF, modrm);
+                }
+                String[] segOff = targetPart.split(":");
                 if (segOff.length == 2) {
                     int seg = parseValue(segOff[0].trim(), symbols);
                     int off = parseValue(segOff[1].trim(), symbols);
@@ -325,6 +329,10 @@ public class MiniAssembler {
                             (byte) (seg & 0xFF), (byte) ((seg >> 8) & 0xFF)
                     };
                 }
+            }
+            if (arg.contains("[")) {
+                ModRM modrm = parseModRM(arg, isCall ? 2 : 4, symbols);
+                return buildModRMInstruction((byte) 0xFF, modrm);
             }
             int r16 = findRegister16(arg);
             if (r16 != -1) {
