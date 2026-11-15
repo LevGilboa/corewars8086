@@ -63,8 +63,8 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
     // Right column: Arena Map
     private ArenaMapView arenaMapView;
 
-    private static final Font MONO_FONT = new Font("Consolas", Font.PLAIN, 12);
-    private static final Font MONO_BOLD = new Font("Consolas", Font.BOLD, 12);
+    private static final Font MONO_FONT = new Font("Consolas", Font.PLAIN, 13);
+    private static final Font MONO_BOLD = new Font("Consolas", Font.BOLD, 13);
 
     public CpuFrame(Competition competition) {
         super("CodeGuru 8086 - Professional Debugger");
@@ -145,17 +145,20 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
                     int pos = viewToModel2D(e.getPoint());
                     if (pos >= 0 && currentRenderedInstructions != null) {
                         javax.swing.text.Document doc = getDocument();
-                        javax.swing.text.Element root = doc.getDefaultRootElement();
-                        int lineIdx = root.getElementIndex(pos);
-                        if (lineIdx >= 0 && lineIdx < root.getElementCount()) {
-                            javax.swing.text.Element lineElem = root.getElement(lineIdx);
-                            int start = lineElem.getStartOffset();
-                            int end = lineElem.getEndOffset();
-                            String lineText = doc.getText(start, end - start).trim();
-                            if (lineText.length() >= 4) {
-                                String hexOff = lineText.substring(0, 4);
+                        String fullText = doc.getText(0, doc.getLength());
+                        int lineStart = fullText.lastIndexOf('\n', pos);
+                        if (lineStart == -1) lineStart = 0;
+                        else lineStart++; // skip newline
+
+                        int lineEnd = fullText.indexOf('\n', pos);
+                        if (lineEnd == -1) lineEnd = fullText.length();
+
+                        String lineText = fullText.substring(lineStart, lineEnd).replace('\u00A0', ' ').trim();
+                        if (lineText.length() >= 4) {
+                            String[] parts = lineText.split("\\s+");
+                            if (parts.length > 0 && parts[0].length() == 4) {
                                 try {
-                                    int off = Integer.parseInt(hexOff, 16);
+                                    int off = Integer.parseInt(parts[0], 16);
                                     for (Disassembler.DecodedInstruction di : currentRenderedInstructions) {
                                         if (di.offset == off) {
                                             Warrior w = getSelectedWarrior();
@@ -168,7 +171,7 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
                         }
                     }
                 } catch (Exception ignored) {}
-                return super.getToolTipText(e);
+                return null;
             }
         };
         codePane.setEditable(false);
@@ -438,7 +441,7 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
             flagBoxes.get("PF").setSelected(s.getParityFlag());
             flagBoxes.get("CF").setSelected(s.getCarryFlag());
 
-            // Instruction Analysis & Ghost Preview on Map & Code Tooltip
+            // Instruction Analysis & Ghost Preview on Map
             InstructionAnalyzer.StepPreview preview = InstructionAnalyzer.analyze(mem, s);
             arenaMapView.setGhostPreview(
                     preview.targetMemoryOffset,
@@ -447,7 +450,6 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
                     preview.label,
                     s.getIP() & 0xFFFF
             );
-            codePane.setToolTipText(preview.tooltipHtml);
 
             // Render Disassembly
             short baseOffset = (customViewOffset != -1) ? (short) customViewOffset : s.getIP();
@@ -487,7 +489,7 @@ public class CpuFrame extends JFrame implements CompetitionEventListener {
         this.currentRenderedInstructions = instrs;
 
         StringBuilder html = new StringBuilder();
-        html.append("<html><body style='font-family:Consolas,monospace; font-size:12px; margin:2px;'>");
+        html.append("<html><body style='font-family:Consolas,monospace; font-size:13px; line-height:1.25; margin:3px;'>");
 
         for (Disassembler.DecodedInstruction di : instrs) {
             boolean isCur = (di.offset == (currentIP & 0xFFFF));

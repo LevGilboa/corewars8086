@@ -16,7 +16,7 @@ import java.util.List;
 /**
  * Enhanced Arena Map View with coordinate axes (0000-E000 on Y, 00-E0 on X),
  * register pointer callouts (CS:IP, DS:AX, DS:BX, etc.), pixel value inspection,
- * and faint/ghost preview of the pending instruction's memory write or branch target.
+ * bold/vibrant preview of the pending instruction's target, and an integrated Magnifier Lens.
  */
 public class ArenaMapView extends JComponent {
     private static final long serialVersionUID = 1L;
@@ -218,7 +218,7 @@ public class ArenaMapView extends JComponent {
             g2.drawLine(tickX, mapY + mapH, tickX, mapY + mapH + 4);
         }
 
-        // Draw Ghost / Faint Preview of Next Opcode Action
+        // Draw Ghost / Bold Action Preview of Next Opcode
         if (ghostTargetOffset != null) {
             int targetX = ghostTargetOffset % ARENA_DIM;
             int targetY = ghostTargetOffset / ARENA_DIM;
@@ -230,21 +230,28 @@ public class ArenaMapView extends JComponent {
             int curIpPixelX = mapX + (int) (ipX * scaleX);
             int curIpPixelY = mapY + (int) (ipY * scaleY);
 
-            Color ghostPrimary = ghostIsWrite ? new Color(255, 110, 40) : new Color(40, 200, 255);
-            Color ghostHalo = ghostIsWrite ? new Color(255, 100, 30, 80) : new Color(30, 180, 255, 80);
-            Color ghostDashed = ghostIsWrite ? new Color(255, 140, 50, 180) : new Color(80, 210, 255, 180);
+            Color ghostPrimary = ghostIsWrite ? new Color(255, 95, 20) : new Color(0, 220, 255);
+            Color ghostHalo = ghostIsWrite ? new Color(255, 100, 20, 100) : new Color(0, 200, 255, 100);
+            Color ghostOuterHalo = ghostIsWrite ? new Color(255, 120, 30, 45) : new Color(0, 220, 255, 45);
 
-            // 1. Dashed trajectory line from current CS:IP to target
+            // 1. Double-pass high-contrast dashed trajectory line from current CS:IP to target
             Stroke oldStroke = g2.getStroke();
-            Stroke dashed = new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{5, 4}, 0);
-            g2.setStroke(dashed);
-            g2.setColor(ghostDashed);
+            // Pass 1: Dark drop-shadow outline
+            Stroke shadowDashed = new BasicStroke(3.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{6, 4}, 0);
+            g2.setStroke(shadowDashed);
+            g2.setColor(new Color(0, 0, 0, 220));
+            g2.drawLine(curIpPixelX, curIpPixelY, pixelX, pixelY);
+
+            // Pass 2: Vibrant neon foreground dashed line
+            Stroke brightDashed = new BasicStroke(2.0f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND, 0, new float[]{6, 4}, 0);
+            g2.setStroke(brightDashed);
+            g2.setColor(ghostPrimary);
             g2.drawLine(curIpPixelX, curIpPixelY, pixelX, pixelY);
             g2.setStroke(oldStroke);
 
-            // 2. Affected bytes preview (for writes spanning multiple bytes, e.g. INT 86 bomb or MOVSW)
+            // 2. Affected bytes preview (e.g. INT 86 bomb 128 bytes or MOVSW 2 bytes)
             if (ghostIsWrite && ghostLength > 1) {
-                g2.setColor(new Color(255, 120, 40, 120));
+                g2.setColor(new Color(255, 130, 30, 140));
                 for (int i = 0; i < Math.min(ghostLength, 256); i++) {
                     int off = (ghostTargetOffset + i) & 0xFFFF;
                     int bx = mapX + (int) ((off % ARENA_DIM) * scaleX);
@@ -253,34 +260,126 @@ public class ArenaMapView extends JComponent {
                 }
             }
 
-            // 3. Faint pulsating halo / highlight box at target
-            int haloSize = 14;
+            // 3. Large High-Visibility Concentric Reticle (Bullseye)
+            // Outer radiant halo
+            g2.setColor(ghostOuterHalo);
+            g2.fillOval(pixelX - 22, pixelY - 22, 44, 44);
+
+            // Mid vibrant ring
             g2.setColor(ghostHalo);
-            g2.fillOval(pixelX - haloSize / 2, pixelY - haloSize / 2, haloSize, haloSize);
+            g2.fillOval(pixelX - 12, pixelY - 12, 24, 24);
 
-            // 4. Crosshair / Target reticle
+            // Center target core
             g2.setColor(ghostPrimary);
+            g2.drawOval(pixelX - 12, pixelY - 12, 24, 24);
             g2.drawRect(pixelX - 4, pixelY - 4, 8, 8);
-            g2.drawLine(pixelX - 6, pixelY, pixelX + 6, pixelY);
-            g2.drawLine(pixelX, pixelY - 6, pixelX, pixelY + 6);
+            g2.setColor(Color.WHITE);
+            g2.fillRect(pixelX - 2, pixelY - 2, 4, 4);
 
-            // 5. Floating preview badge tag
+            // Extended Crosshairs
+            g2.setColor(new Color(0, 0, 0, 200));
+            g2.drawLine(pixelX - 18, pixelY, pixelX + 18, pixelY);
+            g2.drawLine(pixelX, pixelY - 18, pixelX, pixelY + 18);
+            g2.setColor(ghostPrimary);
+            g2.drawLine(pixelX - 16, pixelY, pixelX + 16, pixelY);
+            g2.drawLine(pixelX, pixelY - 16, pixelX, pixelY + 16);
+
+            // 4. Floating preview badge tag
             if (ghostLabel != null && !ghostLabel.isEmpty()) {
-                g2.setFont(new Font("Consolas", Font.BOLD, 10));
-                int tagW = g2.getFontMetrics().stringWidth(ghostLabel) + 12;
-                int tagH = 18;
+                g2.setFont(new Font("Consolas", Font.BOLD, 11));
+                int tagW = g2.getFontMetrics().stringWidth(ghostLabel) + 16;
+                int tagH = 22;
 
-                int tagX = pixelX + 10;
-                int tagY = pixelY - 22;
+                int tagX = pixelX + 12;
+                int tagY = pixelY - 26;
                 if (tagX + tagW > mapX + mapW) tagX = pixelX - tagW - 8;
-                if (tagY < mapY + 4) tagY = pixelY + 10;
+                if (tagY < mapY + 6) tagY = pixelY + 14;
 
-                g2.setColor(new Color(20, 24, 32, 220));
+                g2.setColor(new Color(15, 20, 28, 240));
                 g2.fillRoundRect(tagX, tagY, tagW, tagH, 6, 6);
                 g2.setColor(ghostPrimary);
                 g2.drawRoundRect(tagX, tagY, tagW, tagH, 6, 6);
 
-                g2.drawString(ghostLabel, tagX + 6, tagY + 13);
+                g2.setColor(Color.WHITE);
+                g2.drawString(ghostLabel, tagX + 8, tagY + 15);
+            }
+        }
+
+        // Draw Integrated Magnifier Lens (Zoom 10x) if ghost preview or mouse hover is active
+        int focusOffset = (hoveredOffset != -1) ? hoveredOffset : (ghostTargetOffset != null ? ghostTargetOffset : -1);
+        if (focusOffset >= 0 && focusOffset < War.ARENA_SIZE) {
+            int focusX = focusOffset % ARENA_DIM;
+            int focusY = focusOffset / ARENA_DIM;
+
+            int lensGrid = 7; // 7x7 cells
+            int cellSize = 16; // 16px per cell
+            int gridW = lensGrid * cellSize;
+            int lensW = gridW + 16;
+            int lensH = gridW + 36;
+
+            int lensX = mapX + mapW - lensW - 8;
+            int lensY = mapY + 8;
+
+            // If focus point is in top-right, move lens to bottom-right so it doesn't obstruct the target
+            int tX = mapX + (int) (focusX * scaleX);
+            int tY = mapY + (int) (focusY * scaleY);
+            if (tX > lensX - 30 && tY < lensY + lensH + 30) {
+                lensY = mapY + mapH - lensH - 8;
+            }
+
+            // Lens Panel Background & Border
+            g2.setColor(new Color(15, 18, 25, 245));
+            g2.fillRoundRect(lensX, lensY, lensW, lensH, 8, 8);
+            Color borderColor = (ghostTargetOffset != null && focusOffset == ghostTargetOffset) ?
+                    (ghostIsWrite ? new Color(255, 120, 30) : new Color(0, 220, 255)) :
+                    new Color(90, 130, 180);
+            g2.setColor(borderColor);
+            g2.drawRoundRect(lensX, lensY, lensW, lensH, 8, 8);
+
+            // Lens Title
+            g2.setFont(new Font("Consolas", Font.BOLD, 11));
+            String title = String.format("ZOOM: 0x%04X", focusOffset);
+            g2.setColor(borderColor);
+            g2.drawString(title, lensX + 8, lensY + 15);
+
+            int startGX = lensX + 8;
+            int startGY = lensY + 22;
+
+            g2.setFont(new Font("Consolas", Font.PLAIN, 10));
+            int half = lensGrid / 2;
+            for (int dy = -half; dy <= half; dy++) {
+                for (int dx = -half; dx <= half; dx++) {
+                    int cx = (focusX + dx + ARENA_DIM) % ARENA_DIM;
+                    int cy = (focusY + dy + ARENA_DIM) % ARENA_DIM;
+                    int off = cy * ARENA_DIM + cx;
+
+                    int cellX = startGX + (dx + half) * cellSize;
+                    int cellY = startGY + (dy + half) * cellSize;
+
+                    byte owner = arenaOwners[off];
+                    byte b = arenaBytes[off];
+
+                    if (owner != -1) {
+                        g2.setColor(ColorHolder.getInstance().getColor(owner, false));
+                    } else if (b != (byte) 0xCC) {
+                        g2.setColor(new Color(55, 75, 105));
+                    } else {
+                        g2.setColor(new Color(24, 27, 34));
+                    }
+                    g2.fillRect(cellX, cellY, cellSize - 1, cellSize - 1);
+
+                    // Highlight the exact center target byte
+                    if (dx == 0 && dy == 0) {
+                        g2.setColor(Color.WHITE);
+                        g2.drawRect(cellX - 1, cellY - 1, cellSize, cellSize);
+                        g2.setColor(borderColor);
+                        g2.drawRect(cellX - 2, cellY - 2, cellSize + 2, cellSize + 2);
+                    }
+
+                    // Byte hex text inside cell
+                    g2.setColor((owner != -1 || b != (byte) 0xCC || (dx == 0 && dy == 0)) ? Color.WHITE : new Color(120, 130, 140));
+                    g2.drawString(String.format("%02X", b & 0xFF), cellX + 2, cellY + cellSize - 4);
+                }
             }
         }
 
@@ -318,9 +417,9 @@ public class ArenaMapView extends JComponent {
 
         // Bottom hover inspection status
         if (hoveredOffset != -1) {
-            String hoverText = String.format("0x%04X: 0x%02X (%d)",
+            String hoverText = String.format("OFFSET: 0x%04X | VALUE: 0x%02X (%d)",
                     hoveredOffset, hoveredVal & 0xFF, hoveredVal & 0xFF);
-            g2.setFont(new Font("Consolas", Font.BOLD, 11));
+            g2.setFont(new Font("Consolas", Font.BOLD, 12));
             g2.setColor(Color.WHITE);
             int textW = g2.getFontMetrics().stringWidth(hoverText);
             g2.drawString(hoverText, mapX + (mapW - textW) / 2, totalH - 8);

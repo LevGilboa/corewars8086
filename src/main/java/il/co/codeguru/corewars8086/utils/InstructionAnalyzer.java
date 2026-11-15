@@ -151,11 +151,11 @@ public class InstructionAnalyzer {
         String upper = text.toUpperCase();
 
         StringBuilder html = new StringBuilder();
-        html.append("<html><div style='font-family:Segoe UI,Tahoma,Sans-Serif; font-size:11px; padding:6px; max-width:340px; color:#222222;'>");
+        html.append("<html><div style='font-family:Segoe UI,Tahoma,Sans-Serif; font-size:13px; line-height:1.35; padding:8px; max-width:440px; color:#1a1a1a;'>");
 
         // Header Title Box
-        html.append("<div style='background-color:#1e3a5f; color:#ffffff; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:12px; margin-bottom:6px;'>");
-        html.append("<code>").append(escapeHtml(text)).append("</code>");
+        html.append("<div style='background-color:#1e3a5f; color:#ffffff; padding:6px 10px; border-radius:5px; font-weight:bold; font-size:14px; margin-bottom:8px;'>");
+        html.append("<span style='color:#a8d5ff; font-size:11px; text-transform:uppercase;'>8086 Opcode:</span><br/><code>").append(escapeHtml(text)).append("</code>");
         html.append("</div>");
 
         // Instruction details & micro-steps
