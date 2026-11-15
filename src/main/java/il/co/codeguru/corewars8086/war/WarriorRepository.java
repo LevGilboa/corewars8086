@@ -91,46 +91,35 @@ public class WarriorRepository {
                 continue;
             }
 
-            WarriorData data = readWarriorFile(file, WarriorType.ZOMBIE);
+            WarriorData data = readWarriorFile(file, file.getName(), WarriorType.ZOMBIE);
             zombieGroup.addWarrior(data);
         }
     }
 
     public void readWarriorsFileFromPath(String path) throws IOException {
-        File warriorsDirectory = new File(path);
-
-        fixFiles(warriorsDirectory);
-
-        File[] warriorFiles = warriorsDirectory.listFiles();
-        if (warriorFiles == null) {
-            throw new java.io.FileNotFoundException(
-                    "Error - survivors directory (\"" + path + "\") not found");
-        }
+        Map<String, File> survivorFiles = findSurvivorFiles(new File(path));
 
         WarriorGroup currentGroup = null;
-        // sort by filename
-        Arrays.sort(warriorFiles, (o1, o2) -> o1.getName().compareToIgnoreCase(o2.getName()));
-
-        for (File file : warriorFiles) {
-            if (file.isDirectory()) {
-                continue;
-            }
-
-            String name = file.getName();
+        for (Map.Entry<String, File> entry : survivorFiles.entrySet()) {
+            String name = entry.getKey();
+            File file = entry.getValue();
 
             if (name.endsWith("1")) {
                 // start a new group!
                 currentGroup = new WarriorGroup(name.substring(0, name.length() - 1));
-                currentGroup.addWarrior(readWarriorFile(file, WarriorType.SURVIVOR_1));
+                currentGroup.addWarrior(readWarriorFile(file, name, WarriorType.SURVIVOR_1));
                 warriorNameToGroup.put(name, warriorGroups.size());
             } else if (name.endsWith("2")) {
-                currentGroup.addWarrior(readWarriorFile(file, WarriorType.SURVIVOR_2));
+                if (currentGroup == null) {
+                    throw new IOException("Survivor \"" + name + "\" has no matching \"...1\" file");
+                }
+                currentGroup.addWarrior(readWarriorFile(file, name, WarriorType.SURVIVOR_2));
                 warriorNameToGroup.put(name, warriorGroups.size());
                 warriorGroups.add(currentGroup);
                 currentGroup = null;
             } else {
                 currentGroup = new WarriorGroup(name);
-                currentGroup.addWarrior(readWarriorFile(file, WarriorType.SURVIVOR));
+                currentGroup.addWarrior(readWarriorFile(file, name, WarriorType.SURVIVOR));
                 warriorNameToGroup.put(name, warriorGroups.size());
                 warriorGroups.add(currentGroup);
                 currentGroup = null;
@@ -138,28 +127,41 @@ public class WarriorRepository {
         }
     }
 
-    private void fixFiles(File warriorsDirectory) {
-        if (!warriorsDirectory.exists()) {
-            throw new RuntimeException("Missing directory " + warriorsDirectory.getAbsolutePath());
+    /**
+     * Finds the survivor files in a directory, keyed by warrior name and sorted
+     * by name (case-insensitively).
+     *
+     * A file "name.bin" is a warrior called "name" (and wins over a plain file
+     * with the same name). Other files that contain a dot (e.g. sources) are
+     * ignored. Nothing on disk is ever renamed or deleted.
+     */
+    private static Map<String, File> findSurvivorFiles(File directory) throws IOException {
+        File[] files = directory.listFiles();
+        if (files == null) {
+            throw new FileNotFoundException(
+                    "Error - survivors directory (\"" + directory.getPath() + "\") not found");
         }
-        File[] files = warriorsDirectory.listFiles();
+
+        Map<String, File> byName = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        // plain files first, so that ".bin" files override them
         for (File file : files) {
-            if (file.getName().endsWith(".bin")) {
-                File renameTo = new File(file.getPath().replace(".bin", ""));
-                renameTo.delete();
-                file.renameTo(renameTo);
+            if (!file.isDirectory() && !file.getName().contains(".")) {
+                byName.put(file.getName(), file);
             }
         }
-
-        files = warriorsDirectory.listFiles();
         for (File file : files) {
-            if (file.getName().contains("."))
-                file.delete();
+            String fileName = file.getName();
+            if (!file.isDirectory() && fileName.endsWith(".bin")) {
+                String name = fileName.substring(0, fileName.length() - ".bin".length());
+                if (!name.isEmpty() && !name.contains(".")) {
+                    byName.put(name, file);
+                }
+            }
         }
+        return byName;
     }
 
-    private static WarriorData readWarriorFile(File file, WarriorType type) throws IOException {
-        String warriorName = file.getName();
+    private static WarriorData readWarriorFile(File file, String warriorName, WarriorType type) throws IOException {
 
         int warriorSize = (int) file.length();
         if (warriorSize > MAX_WARRIOR_SIZE) {
