@@ -167,9 +167,10 @@ public class WarriorRepository {
         }
 
         byte[] warriorData = new byte[warriorSize];
-        FileInputStream fis = new FileInputStream(file);
-        int size = fis.read(warriorData);
-        fis.close();
+        int size;
+        try (FileInputStream fis = new FileInputStream(file)) {
+            size = fis.read(warriorData);
+        }
 
         if (size != warriorSize) {
             throw new IOException();
