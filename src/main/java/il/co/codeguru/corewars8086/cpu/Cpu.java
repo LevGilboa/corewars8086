@@ -23,6 +23,7 @@ public class Cpu {
         m_state = state;
         m_memory = memory;
         m_fetcher = new OpcodeFetcher(m_state, m_memory);
+        m_alu = new Alu(m_state);
         m_regs = new RegisterIndexingDecoder(m_state);
         m_indirect = new IndirectAddressingDecoder(m_state, m_memory, m_fetcher);
     }
@@ -91,25 +92,25 @@ public class Cpu {
         switch (opcode) {
             case (byte)0x00: // ADD [X], reg8
                 m_indirect.reset();
-                m_indirect.setMem8(add8(m_indirect.getMem8(), m_indirect.getReg8()));
+                m_indirect.setMem8(m_alu.add8(m_indirect.getMem8(), m_indirect.getReg8()));
                 break;
             case (byte)0x01: // ADD [X], reg16
                 m_indirect.reset();
-                m_indirect.setMem16(add16(m_indirect.getMem16(), m_indirect.getReg16()));
+                m_indirect.setMem16(m_alu.add16(m_indirect.getMem16(), m_indirect.getReg16()));
                 break;
             case (byte)0x02: // ADD reg8, [X]
                 m_indirect.reset();
-                m_indirect.setReg8(add8(m_indirect.getReg8(), m_indirect.getMem8()));
+                m_indirect.setReg8(m_alu.add8(m_indirect.getReg8(), m_indirect.getMem8()));
                 break;
             case (byte)0x03: // ADD reg16, [X]
                 m_indirect.reset();
-                m_indirect.setReg16(add16(m_indirect.getReg16(), m_indirect.getMem16()));
+                m_indirect.setReg16(m_alu.add16(m_indirect.getReg16(), m_indirect.getMem16()));
                 break;
             case (byte)0x04: // ADD AL, imm8
-                m_state.setAL(add8(m_state.getAL(), m_fetcher.nextByte()));
+                m_state.setAL(m_alu.add8(m_state.getAL(), m_fetcher.nextByte()));
                 break;
             case (byte)0x05: // ADD AX, imm16
-                m_state.setAX(add16(m_state.getAX(), m_fetcher.nextWord()));
+                m_state.setAX(m_alu.add16(m_state.getAX(), m_fetcher.nextWord()));
                 break;
             case (byte)0x06: // PUSH ES
                 push(m_state.getES());
@@ -119,25 +120,25 @@ public class Cpu {
                 break;				
             case (byte)0x08: // OR [X], reg8
                 m_indirect.reset();
-                m_indirect.setMem8(or8(m_indirect.getMem8(), m_indirect.getReg8()));
+                m_indirect.setMem8(m_alu.or8(m_indirect.getMem8(), m_indirect.getReg8()));
                 break;				
             case (byte)0x09: // OR [X], reg16
                 m_indirect.reset();
-                m_indirect.setMem16(or16(m_indirect.getMem16(), m_indirect.getReg16()));
+                m_indirect.setMem16(m_alu.or16(m_indirect.getMem16(), m_indirect.getReg16()));
                 break;
             case (byte)0x0A: // OR reg8, [X]
                 m_indirect.reset();
-                m_indirect.setReg8(or8(m_indirect.getReg8(), m_indirect.getMem8()));
+                m_indirect.setReg8(m_alu.or8(m_indirect.getReg8(), m_indirect.getMem8()));
                 break;
             case (byte)0x0B: // OR reg16, [X]
                 m_indirect.reset();
-                m_indirect.setReg16(or16(m_indirect.getReg16(), m_indirect.getMem16()));
+                m_indirect.setReg16(m_alu.or16(m_indirect.getReg16(), m_indirect.getMem16()));
                 break;
             case (byte)0x0C: // OR AL, imm8
-                m_state.setAL(or8(m_state.getAL(), m_fetcher.nextByte()));
+                m_state.setAL(m_alu.or8(m_state.getAL(), m_fetcher.nextByte()));
                 break;
             case (byte)0x0D: // OR AX, imm16
-                m_state.setAX(or16(m_state.getAX(), m_fetcher.nextWord()));
+                m_state.setAX(m_alu.or16(m_state.getAX(), m_fetcher.nextWord()));
                 break;				
             case (byte)0x0E: // PUSH CS
                 push(m_state.getCS());
@@ -154,25 +155,25 @@ public class Cpu {
         switch (opcode) {
             case (byte)0x10: // ADC [X], reg8
                 m_indirect.reset();
-                m_indirect.setMem8(adc8(m_indirect.getMem8(), m_indirect.getReg8()));
+                m_indirect.setMem8(m_alu.adc8(m_indirect.getMem8(), m_indirect.getReg8()));
                 break;
             case (byte)0x11: // ADC [X], reg16
                 m_indirect.reset();
-                m_indirect.setMem16(adc16(m_indirect.getMem16(), m_indirect.getReg16()));
+                m_indirect.setMem16(m_alu.adc16(m_indirect.getMem16(), m_indirect.getReg16()));
                 break;
             case (byte)0x12: // ADC reg8, [X]
                 m_indirect.reset();
-                m_indirect.setReg8(adc8(m_indirect.getReg8(), m_indirect.getMem8()));
+                m_indirect.setReg8(m_alu.adc8(m_indirect.getReg8(), m_indirect.getMem8()));
                 break;
             case (byte)0x13: // ADC reg16, [X]
                 m_indirect.reset();
-                m_indirect.setReg16(adc16(m_indirect.getReg16(), m_indirect.getMem16()));
+                m_indirect.setReg16(m_alu.adc16(m_indirect.getReg16(), m_indirect.getMem16()));
                 break;
             case (byte)0x14: // ADC AL, imm8
-                m_state.setAL(adc8(m_state.getAL(), m_fetcher.nextByte()));
+                m_state.setAL(m_alu.adc8(m_state.getAL(), m_fetcher.nextByte()));
                 break;
             case (byte)0x15: // ADC AX, imm16
-                m_state.setAX(adc16(m_state.getAX(), m_fetcher.nextWord()));
+                m_state.setAX(m_alu.adc16(m_state.getAX(), m_fetcher.nextWord()));
                 break;			
             case (byte)0x16: // PUSH SS
                 push(m_state.getSS());
@@ -182,25 +183,25 @@ public class Cpu {
                 break;
             case (byte)0x18: // SBB [X], reg8
                 m_indirect.reset();
-                m_indirect.setMem8(sbb8(m_indirect.getMem8(), m_indirect.getReg8()));
+                m_indirect.setMem8(m_alu.sbb8(m_indirect.getMem8(), m_indirect.getReg8()));
                 break;
             case (byte)0x19: // SBB [X], reg16
                 m_indirect.reset();
-                m_indirect.setMem16(sbb16(m_indirect.getMem16(), m_indirect.getReg16()));
+                m_indirect.setMem16(m_alu.sbb16(m_indirect.getMem16(), m_indirect.getReg16()));
                 break;
             case (byte)0x1A: // SBB reg8, [X]
                 m_indirect.reset();
-                m_indirect.setReg8(sbb8(m_indirect.getReg8(), m_indirect.getMem8()));
+                m_indirect.setReg8(m_alu.sbb8(m_indirect.getReg8(), m_indirect.getMem8()));
                 break;
             case (byte)0x1B: // SBB reg16, [X]
                 m_indirect.reset();
-                m_indirect.setReg16(sbb16(m_indirect.getReg16(), m_indirect.getMem16()));
+                m_indirect.setReg16(m_alu.sbb16(m_indirect.getReg16(), m_indirect.getMem16()));
                 break;
             case (byte)0x1C: // SBB AL, imm8
-                m_state.setAL(sbb8(m_state.getAL(), m_fetcher.nextByte()));
+                m_state.setAL(m_alu.sbb8(m_state.getAL(), m_fetcher.nextByte()));
                 break;
             case (byte)0x1D: // SBB AX, imm16
-                m_state.setAX(sbb16(m_state.getAX(), m_fetcher.nextWord()));
+                m_state.setAX(m_alu.sbb16(m_state.getAX(), m_fetcher.nextWord()));
                 break;				
             case (byte)0x1E: // PUSH DS
                 push(m_state.getDS());
@@ -217,50 +218,50 @@ public class Cpu {
         switch (opcode) {			
             case (byte)0x20: // AND [X], reg8
                 m_indirect.reset();
-                m_indirect.setMem8(and8(m_indirect.getMem8(), m_indirect.getReg8()));
+                m_indirect.setMem8(m_alu.and8(m_indirect.getMem8(), m_indirect.getReg8()));
                 break;
             case (byte)0x21: // AND [X], reg16
                 m_indirect.reset();
-                m_indirect.setMem16(and16(m_indirect.getMem16(), m_indirect.getReg16()));
+                m_indirect.setMem16(m_alu.and16(m_indirect.getMem16(), m_indirect.getReg16()));
                 break;
             case (byte)0x22: // AND reg8, [X]
                 m_indirect.reset();
-                m_indirect.setReg8(and8(m_indirect.getReg8(), m_indirect.getMem8()));
+                m_indirect.setReg8(m_alu.and8(m_indirect.getReg8(), m_indirect.getMem8()));
                 break;
             case (byte)0x23: // AND reg16, [X]
                 m_indirect.reset();
-                m_indirect.setReg16(and16(m_indirect.getReg16(), m_indirect.getMem16()));
+                m_indirect.setReg16(m_alu.and16(m_indirect.getReg16(), m_indirect.getMem16()));
                 break;
             case (byte)0x24: // AND AL, imm8
-                m_state.setAL(and8(m_state.getAL(), m_fetcher.nextByte()));
+                m_state.setAL(m_alu.and8(m_state.getAL(), m_fetcher.nextByte()));
                 break;
             case (byte)0x25: // AND AX, imm16
-                m_state.setAX(and16(m_state.getAX(), m_fetcher.nextWord()));
+                m_state.setAX(m_alu.and16(m_state.getAX(), m_fetcher.nextWord()));
                 break;			
             case (byte)0x26: // TODO: 'ES:' prefix
             case (byte)0x27: // TODO: DAA
                 throw new UnimplementedOpcodeException();
             case (byte)0x28: // SUB [X], reg8
                 m_indirect.reset();
-                m_indirect.setMem8(sub8(m_indirect.getMem8(), m_indirect.getReg8()));
+                m_indirect.setMem8(m_alu.sub8(m_indirect.getMem8(), m_indirect.getReg8()));
                 break;
             case (byte)0x29: // SUB [X], reg16
                 m_indirect.reset();
-                m_indirect.setMem16(sub16(m_indirect.getMem16(), m_indirect.getReg16()));
+                m_indirect.setMem16(m_alu.sub16(m_indirect.getMem16(), m_indirect.getReg16()));
                 break;
             case (byte)0x2A: // SUB reg8, [X]
                 m_indirect.reset();
-                m_indirect.setReg8(sub8(m_indirect.getReg8(), m_indirect.getMem8()));
+                m_indirect.setReg8(m_alu.sub8(m_indirect.getReg8(), m_indirect.getMem8()));
                 break;
             case (byte)0x2B: // SUB reg16, [X]
                 m_indirect.reset();
-                m_indirect.setReg16(sub16(m_indirect.getReg16(), m_indirect.getMem16()));
+                m_indirect.setReg16(m_alu.sub16(m_indirect.getReg16(), m_indirect.getMem16()));
                 break;
             case (byte)0x2C: // SUB AL, imm8
-                m_state.setAL(sub8(m_state.getAL(), m_fetcher.nextByte()));
+                m_state.setAL(m_alu.sub8(m_state.getAL(), m_fetcher.nextByte()));
                 break;
             case (byte)0x2D: // SUB AX, imm16
-                m_state.setAX(sub16(m_state.getAX(), m_fetcher.nextWord()));
+                m_state.setAX(m_alu.sub16(m_state.getAX(), m_fetcher.nextWord()));
                 break;	
             case (byte)0x2E: // TODO: 'CS:' prefix
             case (byte)0x2F: // TODO: DAS
@@ -274,50 +275,50 @@ public class Cpu {
         switch (opcode) {			
             case (byte)0x30: // XOR [X], reg8
                 m_indirect.reset();
-                m_indirect.setMem8(xor8(m_indirect.getMem8(), m_indirect.getReg8()));
+                m_indirect.setMem8(m_alu.xor8(m_indirect.getMem8(), m_indirect.getReg8()));
                 break;
             case (byte)0x31: // XOR [X], reg16
                 m_indirect.reset();
-                m_indirect.setMem16(xor16(m_indirect.getMem16(), m_indirect.getReg16()));
+                m_indirect.setMem16(m_alu.xor16(m_indirect.getMem16(), m_indirect.getReg16()));
                 break;
             case (byte)0x32: // XOR reg8, [X]
                 m_indirect.reset();
-                m_indirect.setReg8(xor8(m_indirect.getReg8(), m_indirect.getMem8()));
+                m_indirect.setReg8(m_alu.xor8(m_indirect.getReg8(), m_indirect.getMem8()));
                 break;
             case (byte)0x33: // XOR reg16, [X]
                 m_indirect.reset();
-                m_indirect.setReg16(xor16(m_indirect.getReg16(), m_indirect.getMem16()));
+                m_indirect.setReg16(m_alu.xor16(m_indirect.getReg16(), m_indirect.getMem16()));
                 break;
             case (byte)0x34: // XOR AL, imm8
-                m_state.setAL(xor8(m_state.getAL(), m_fetcher.nextByte()));
+                m_state.setAL(m_alu.xor8(m_state.getAL(), m_fetcher.nextByte()));
                 break;
             case (byte)0x35: // XOR AX, imm16
-                m_state.setAX(xor16(m_state.getAX(), m_fetcher.nextWord()));
+                m_state.setAX(m_alu.xor16(m_state.getAX(), m_fetcher.nextWord()));
                 break;			
             case (byte)0x36: // TODO: 'SS:' prefix
             case (byte)0x37: // TODO: AAA
                 throw new UnimplementedOpcodeException();
             case (byte)0x38: // CMP [X], reg8
                 m_indirect.reset();
-                sub8(m_indirect.getMem8(), m_indirect.getReg8());
+                m_alu.sub8(m_indirect.getMem8(), m_indirect.getReg8());
                 break;
             case (byte)0x39: // CMP [X], reg16
                 m_indirect.reset();
-                sub16(m_indirect.getMem16(), m_indirect.getReg16());
+                m_alu.sub16(m_indirect.getMem16(), m_indirect.getReg16());
                 break;
             case (byte)0x3A: // CMP reg8, [X]
                 m_indirect.reset();
-                sub8(m_indirect.getReg8(), m_indirect.getMem8());
+                m_alu.sub8(m_indirect.getReg8(), m_indirect.getMem8());
                 break;
             case (byte)0x3B: // CMP reg16, [X]
                 m_indirect.reset();
-                sub16(m_indirect.getReg16(), m_indirect.getMem16());
+                m_alu.sub16(m_indirect.getReg16(), m_indirect.getMem16());
                 break;
             case (byte)0x3C: // CMP AL, imm8
-                sub8(m_state.getAL(), m_fetcher.nextByte());
+                m_alu.sub8(m_state.getAL(), m_fetcher.nextByte());
                 break;
             case (byte)0x3D: // CMP AX, imm16
-                sub16(m_state.getAX(), m_fetcher.nextWord());
+                m_alu.sub16(m_state.getAX(), m_fetcher.nextWord());
                 break;
             case (byte)0x3E: // TODO: 'DS:' prefix
             case (byte)0x3F: // TODO: AAS
@@ -338,7 +339,7 @@ public class Cpu {
             case (byte)0x45:
             case (byte)0x46:
             case (byte)0x47:
-                m_regs.setReg16(index, inc16(m_regs.getReg16(index)));
+                m_regs.setReg16(index, m_alu.inc16(m_regs.getReg16(index)));
                 break;
             case (byte)0x48: // DEC reg16
             case (byte)0x49:
@@ -348,7 +349,7 @@ public class Cpu {
             case (byte)0x4D:
             case (byte)0x4E:
             case (byte)0x4F:
-                m_regs.setReg16(index, dec16(m_regs.getReg16(index)));
+                m_regs.setReg16(index, m_alu.dec16(m_regs.getReg16(index)));
                 break;
             default:
                 throw new RuntimeException();
@@ -456,34 +457,34 @@ public class Cpu {
                 switch (m_indirect.getRegIndex()) {
                     case 0: // ADD
                         m_indirect.setMem8(
-                            add8(m_indirect.getMem8(), m_fetcher.nextByte()));
+                            m_alu.add8(m_indirect.getMem8(), m_fetcher.nextByte()));
                         break;
                     case 1: // OR
                         m_indirect.setMem8(
-                            or8(m_indirect.getMem8(), m_fetcher.nextByte()));
+                            m_alu.or8(m_indirect.getMem8(), m_fetcher.nextByte()));
                         break;
                     case 2: // ADC
                         m_indirect.setMem8(
-                            adc8(m_indirect.getMem8(), m_fetcher.nextByte()));						
+                            m_alu.adc8(m_indirect.getMem8(), m_fetcher.nextByte()));						
                         break;
                     case 3: // SBB
                         m_indirect.setMem8(
-                            sbb8(m_indirect.getMem8(), m_fetcher.nextByte()));						
+                            m_alu.sbb8(m_indirect.getMem8(), m_fetcher.nextByte()));						
                         break;
                     case 4: // AND
                         m_indirect.setMem8(
-                            and8(m_indirect.getMem8(), m_fetcher.nextByte()));
+                            m_alu.and8(m_indirect.getMem8(), m_fetcher.nextByte()));
                         break;
                     case 5: // SUB
                         m_indirect.setMem8(
-                            sub8(m_indirect.getMem8(), m_fetcher.nextByte()));						
+                            m_alu.sub8(m_indirect.getMem8(), m_fetcher.nextByte()));						
                         break;
                     case 6: // XOR
                         m_indirect.setMem8(
-                            xor8(m_indirect.getMem8(), m_fetcher.nextByte()));
+                            m_alu.xor8(m_indirect.getMem8(), m_fetcher.nextByte()));
                         break;
                     case 7: // CMP
-                        sub8(m_indirect.getMem8(), m_fetcher.nextByte());
+                        m_alu.sub8(m_indirect.getMem8(), m_fetcher.nextByte());
                         break;
                     default:
                         throw new RuntimeException();
@@ -494,34 +495,34 @@ public class Cpu {
                 switch (m_indirect.getRegIndex()) {
                     case 0: // ADD
                         m_indirect.setMem16(
-                            add16(m_indirect.getMem16(), m_fetcher.nextWord()));
+                            m_alu.add16(m_indirect.getMem16(), m_fetcher.nextWord()));
                         break;
                     case 1: // OR
                         m_indirect.setMem16(
-                            or16(m_indirect.getMem16(), m_fetcher.nextWord()));
+                            m_alu.or16(m_indirect.getMem16(), m_fetcher.nextWord()));
                         break;
                     case 2: // ADC
                         m_indirect.setMem16(
-                            adc16(m_indirect.getMem16(), m_fetcher.nextWord()));						
+                            m_alu.adc16(m_indirect.getMem16(), m_fetcher.nextWord()));						
                         break;
                     case 3: // SBB
                         m_indirect.setMem16(
-                            sbb16(m_indirect.getMem16(), m_fetcher.nextWord()));						
+                            m_alu.sbb16(m_indirect.getMem16(), m_fetcher.nextWord()));						
                         break;
                     case 4: // AND
                         m_indirect.setMem16(
-                            and16(m_indirect.getMem16(), m_fetcher.nextWord()));
+                            m_alu.and16(m_indirect.getMem16(), m_fetcher.nextWord()));
                         break;
                     case 5: // SUB
                         m_indirect.setMem16(
-                            sub16(m_indirect.getMem16(), m_fetcher.nextWord()));						
+                            m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextWord()));						
                         break;
                     case 6: // XOR
                         m_indirect.setMem16(
-                            xor16(m_indirect.getMem16(), m_fetcher.nextWord()));
+                            m_alu.xor16(m_indirect.getMem16(), m_fetcher.nextWord()));
                         break;
                     case 7: // CMP
-                        sub16(m_indirect.getMem16(), m_fetcher.nextWord());
+                        m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextWord());
                         break;
                     default:
                         throw new RuntimeException();
@@ -532,34 +533,34 @@ public class Cpu {
                 switch (m_indirect.getRegIndex()) {
                     case 0: // ADD
                         m_indirect.setMem16(
-                            add16(m_indirect.getMem16(), m_fetcher.nextByte()));
+                            m_alu.add16(m_indirect.getMem16(), m_fetcher.nextByte()));
                         break;
                     case 1: // OR
                         m_indirect.setMem16(
-                            or16(m_indirect.getMem16(), m_fetcher.nextByte()));
+                            m_alu.or16(m_indirect.getMem16(), m_fetcher.nextByte()));
                         break;
                     case 2: // ADC
                         m_indirect.setMem16(
-                            adc16(m_indirect.getMem16(), m_fetcher.nextByte()));						
+                            m_alu.adc16(m_indirect.getMem16(), m_fetcher.nextByte()));						
                         break;
                     case 3: // SBB
                         m_indirect.setMem16(
-                            sbb16(m_indirect.getMem16(), m_fetcher.nextByte()));						
+                            m_alu.sbb16(m_indirect.getMem16(), m_fetcher.nextByte()));						
                         break;
                     case 4: // AND
                         m_indirect.setMem16(
-                            and16(m_indirect.getMem16(), m_fetcher.nextByte()));
+                            m_alu.and16(m_indirect.getMem16(), m_fetcher.nextByte()));
                         break;
                     case 5: // SUB
                         m_indirect.setMem16(
-                            sub16(m_indirect.getMem16(), m_fetcher.nextByte()));						
+                            m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextByte()));						
                         break;
                     case 6: // XOR
                         m_indirect.setMem16(
-                            xor16(m_indirect.getMem16(), m_fetcher.nextByte()));
+                            m_alu.xor16(m_indirect.getMem16(), m_fetcher.nextByte()));
                         break;
                     case 7: // CMP
-                        sub16(m_indirect.getMem16(), m_fetcher.nextByte());
+                        m_alu.sub16(m_indirect.getMem16(), m_fetcher.nextByte());
                         break;
                     default:
                         throw new RuntimeException();
@@ -567,11 +568,11 @@ public class Cpu {
                 break;
             case (byte)0x84: // TEST reg8, [X]
                 m_indirect.reset();
-                and8(m_indirect.getReg8(), m_indirect.getMem8());
+                m_alu.and8(m_indirect.getReg8(), m_indirect.getMem8());
                 break;				
             case (byte)0x85: // TEST reg16, [X]
                 m_indirect.reset();
-                and16(m_indirect.getReg16(), m_indirect.getMem16());
+                m_alu.and16(m_indirect.getReg16(), m_indirect.getMem16());
                 break;				
             case (byte)0x86: // XCHG reg8, [X]
                 m_indirect.reset();
@@ -726,10 +727,10 @@ public class Cpu {
                 cmpsw();
                 break;
             case (byte)0xA8: // TEST AL, imm8
-                and8(m_state.getAL(), m_fetcher.nextByte());
+                m_alu.and8(m_state.getAL(), m_fetcher.nextByte());
                 break;
             case (byte)0xA9: // TEST AX, imm16
-                and16(m_state.getAX(), m_fetcher.nextWord());
+                m_alu.and16(m_state.getAX(), m_fetcher.nextWord());
                 break;				
             case (byte)0xAA: // STOSB
                 stosb();
@@ -1222,7 +1223,7 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case 0: // TEST imm8
-                        and8(m_indirect.getMem8(), m_fetcher.nextByte());
+                        m_alu.and8(m_indirect.getMem8(), m_fetcher.nextByte());
                         break;
                     case 1:
                         throw new InvalidOpcodeException();							
@@ -1230,7 +1231,7 @@ public class Cpu {
                         m_indirect.setMem8((byte)(m_indirect.getMem8() ^ 0xFF));
                         break;
                     case 3: // NEG
-                        m_indirect.setMem8(sub8((byte)0, m_indirect.getMem8()));						
+                        m_indirect.setMem8(m_alu.sub8((byte)0, m_indirect.getMem8()));						
                         break;
                     case 4: // MUL
                         // multiply
@@ -1274,7 +1275,7 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case 0: // TEST imm16
-                        and16(m_indirect.getMem16(), m_fetcher.nextWord());
+                        m_alu.and16(m_indirect.getMem16(), m_fetcher.nextWord());
                         break;
                     case 1:
                         throw new InvalidOpcodeException();							
@@ -1282,7 +1283,7 @@ public class Cpu {
                         m_indirect.setMem16((short)(m_indirect.getMem16() ^ 0xFFFF));
                         break;
                     case 3: // NEG
-                        m_indirect.setMem16(sub16((short)0, m_indirect.getMem16()));						
+                        m_indirect.setMem16(m_alu.sub16((short)0, m_indirect.getMem16()));						
                         break;
                     case 4: // MUL
                         // multiply
@@ -1346,10 +1347,10 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case 0: // INC
-                        m_indirect.setMem8(inc8(m_indirect.getMem8()));
+                        m_indirect.setMem8(m_alu.inc8(m_indirect.getMem8()));
                         break;
                     case 1: // DEC
-                        m_indirect.setMem8(dec8(m_indirect.getMem8()));
+                        m_indirect.setMem8(m_alu.dec8(m_indirect.getMem8()));
                         break;
                     case 2:
                     case 3:
@@ -1367,10 +1368,10 @@ public class Cpu {
                 m_indirect.reset();
                 switch (m_indirect.getRegIndex()) {
                     case 0: // INC
-                        m_indirect.setMem16(inc16(m_indirect.getMem16()));
+                        m_indirect.setMem16(m_alu.inc16(m_indirect.getMem16()));
                         break;
                     case 1: // DEC
-                        m_indirect.setMem16(dec16(m_indirect.getMem16()));
+                        m_indirect.setMem16(m_alu.dec16(m_indirect.getMem16()));
                         break;
                     case 2: // CALL near
                         callNear(m_indirect.getMem16());
@@ -1438,265 +1439,6 @@ public class Cpu {
     }	
 
     /**
-     * Updates the CPU flags register after an 8bit operation.
-     * @param value  Result of an 8bit operation.
-     */
-    private void updateFlags8(short value) {
-        m_state.setCarryFlag((value & 0xFF00) != 0);
-        // TODO: update overflow flag
-        updateFlagsNoCarryOverflow8((byte)value);
-    }
-
-    /**
-     * Updates the CPU flags register after a 16bit operation.
-     * @param value  Result of a 16bit operation.
-     */
-    private void updateFlags16(int value) {
-        m_state.setCarryFlag((value & 0xFFFF0000) != 0);
-        // TODO: update overflow flag
-        updateFlagsNoCarryOverflow16((short)value);
-    }
-
-    /**
-     * Updates the CPU flags register after an 8bit operation, except for the
-     * Carry and Overflow flags.
-     * @param value  Result of an 8bit operation.
-     */
-    private void updateFlagsNoCarryOverflow8(byte value) {
-        // TODO: update aux flag		
-        m_state.setParityFlag(getParity(value));
-        m_state.setSignFlag((value & 0x80) != 0);
-        m_state.setZeroFlag(value == 0);		
-    }
-
-    /**
-     * Updates the CPU flags register after a 16bit operation, except for the
-     * Carry and Overflow flags.
-     * @param value  Result of a 16bit operation.
-     */
-    private void updateFlagsNoCarryOverflow16(short value) {
-        byte byteValue = (byte)value;
-        // TODO: update aux flag		
-        m_state.setParityFlag(getParity(byteValue));
-        m_state.setSignFlag((value & 0x8000) != 0);
-        m_state.setZeroFlag(value == 0);
-    }	
-
-    /**
-     * Adds two 8bit values, updates the flags and returns the result.
-     */
-    private byte add8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) + Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
-    }
-
-    /**
-     * Adds two 16bit values, updates the flags and returns the result.
-     */
-    private short add16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) + Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }
-
-    /**
-     * Increments an 8bit value, updates the flags and returns the result.
-     * Note: does not modify the carry flag.
-     */
-    private byte inc8(byte value) {
-        boolean oldCarry = m_state.getCarryFlag();
-        byte result = add8(value, (byte)1);
-        m_state.setCarryFlag(oldCarry);
-        return result;		
-    }
-
-    /**
-     * Increments a 16bit value, updates the flags and returns the result.
-     * Note: does not modify the carry flag.
-     */
-    private short inc16(short value) {
-        boolean oldCarry = m_state.getCarryFlag();
-        short result = add16(value, (short)1);
-        m_state.setCarryFlag(oldCarry);
-        return result;		
-    }
-
-    /**
-     * Decrements an 8bit value, updates the flags and returns the result.
-     * Note: does not modify the carry flag.
-     */
-    private byte dec8(byte value) {
-        boolean oldCarry = m_state.getCarryFlag();
-        byte result = sub8(value, (byte)1);
-        m_state.setCarryFlag(oldCarry);
-        return result;		
-    }
-
-    /**
-     * Decrements a 16bit value, updates the flags and returns the result.
-     * Note: does not modify the carry flag.
-     */
-    private short dec16(short value) {
-        boolean oldCarry = m_state.getCarryFlag();
-        short result = sub16(value, (short)1);
-        m_state.setCarryFlag(oldCarry);
-        return result;		
-    }
-
-    /**
-     * ORs two 8bit values, updates the flags and returns the result.
-     */
-    private byte or8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) | Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
-    }
-
-    /**
-     * ORs two 16bit values, updates the flags and returns the result.
-     */
-    private short or16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) | Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }
-
-    /**
-     * Adds two 8bit values with the carry flag, updates the flags and returns
-     * the result.
-     */
-    private byte adc8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) + Unsigned.unsignedByte(value2));
-        if (m_state.getCarryFlag()) {
-            ++result16;
-        }
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
-    }
-
-    /**
-     * Adds two 16bit values with the carry flag, updates the flags and returns
-     * the result.
-     */
-    private short adc16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) + Unsigned.unsignedShort(value2);
-        if (m_state.getCarryFlag()) {
-            ++result32;
-        }
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }	
-
-    /**
-     * Subtracts a given 8bit value with the sum of a second 8bit value and the
-     * carry flag, updates the flags and returns the result.
-     */
-    private byte sbb8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) - Unsigned.unsignedByte(value2));
-        if (m_state.getCarryFlag()) {
-            --result16;
-        }
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
-    }
-
-    /**
-     * Subtracts a given 16bit value with the sum of a second 16bit value and the
-     * carry flag, updates the flags and returns the result.
-     */
-    private short sbb16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) - Unsigned.unsignedShort(value2);
-        if (m_state.getCarryFlag()) {
-            --result32;
-        }
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }
-
-    /**
-     * ANDs two 8bit values, updates the flags and returns the result.
-     */
-    private byte and8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) & Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
-    }
-
-    /**
-     * ANDs two 16bit values, updates the flags and returns the result.
-     */
-    private short and16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) & Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }	
-
-    /**
-     * Subtracts two 8bit values, updates the flags and returns the result.
-     */
-    private byte sub8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) - Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
-    }
-
-    /**
-     * Subtracts two 16bit values, updates the flags and returns the result.
-     */
-    private short sub16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) - Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }
-
-    /**
-     * XORs two 8bit values, updates the flags and returns the result.
-     */
-    private byte xor8(byte value1, byte value2) {
-        short result16 = 
-            (short)(Unsigned.unsignedByte(value1) ^ Unsigned.unsignedByte(value2));
-        byte result8 = (byte)result16;	
-        updateFlags8(result16);
-        return result8;
-    }
-
-    /**
-     * XORs two 16bit values, updates the flags and returns the result.
-     */
-    private short xor16(short value1, short value2) {
-        int result32 =
-            Unsigned.unsignedShort(value1) ^ Unsigned.unsignedShort(value2);
-        short result16 = (short)result32;		
-        updateFlags16(result32);
-        return result16;
-    }
-
-    /**
      * Implements a near call opcode.
      * @param offset    New value for IP (CS stays the same).
      * @throws MemoryException
@@ -1759,7 +1501,7 @@ public class Cpu {
             new RealModeAddress(m_state.getDS(), m_state.getSI());
         RealModeAddress address2 =
             new RealModeAddress(m_state.getES(), m_state.getDI());
-        sub8(m_memory.readByte(address1), m_memory.readByte(address2));		
+        m_alu.sub8(m_memory.readByte(address1), m_memory.readByte(address2));		
 
         byte diff = (m_state.getDirectionFlag() ? (byte)-1 : (byte)1); 
         m_state.setSI((short)(m_state.getSI() + diff));
@@ -1775,7 +1517,7 @@ public class Cpu {
             new RealModeAddress(m_state.getDS(), m_state.getSI());
         RealModeAddress address2 =
             new RealModeAddress(m_state.getES(), m_state.getDI());
-        sub16(m_memory.readWord(address1), m_memory.readWord(address2));		
+        m_alu.sub16(m_memory.readWord(address1), m_memory.readWord(address2));		
 
         byte diff = (m_state.getDirectionFlag() ? (byte)-2 : (byte)2); 
         m_state.setSI((short)(m_state.getSI() + diff));
@@ -1854,7 +1596,7 @@ public class Cpu {
     private void scasb() throws MemoryException {
         RealModeAddress address =
             new RealModeAddress(m_state.getES(), m_state.getDI());
-        sub8(m_state.getAL(), m_memory.readByte(address));
+        m_alu.sub8(m_state.getAL(), m_memory.readByte(address));
         byte diff = (m_state.getDirectionFlag() ? (byte)-1 : (byte)1); 
         m_state.setDI((short)(m_state.getDI() + diff));
     }
@@ -1866,7 +1608,7 @@ public class Cpu {
     private void scasw() throws MemoryException {
         RealModeAddress address =
             new RealModeAddress(m_state.getES(), m_state.getDI());
-        sub16(m_state.getAX(), m_memory.readWord(address));
+        m_alu.sub16(m_state.getAX(), m_memory.readWord(address));
         byte diff = (m_state.getDirectionFlag() ? (byte)-2 : (byte)2); 
         m_state.setDI((short)(m_state.getDI() + diff));
     }
@@ -1954,7 +1696,7 @@ public class Cpu {
 
             m_state.setCarryFlag(msb1 != 0);
             m_state.setOverflowFlag(msb1 != msb2);
-            updateFlagsNoCarryOverflow8(val);
+            m_alu.updateFlagsNoCarryOverflow8(val);
         }
     }
 
@@ -1973,7 +1715,7 @@ public class Cpu {
 
             m_state.setCarryFlag(lsb != 0);
             m_state.setOverflowFlag(msb1 != msb2);
-            updateFlagsNoCarryOverflow8(val);
+            m_alu.updateFlagsNoCarryOverflow8(val);
         }
     }
 
@@ -1992,7 +1734,7 @@ public class Cpu {
 
             m_state.setCarryFlag(lsb != 0);
             m_state.setOverflowFlag(msb1 != msb2);
-            updateFlagsNoCarryOverflow8(val);
+            m_alu.updateFlagsNoCarryOverflow8(val);
         }
     }
 
@@ -2009,7 +1751,7 @@ public class Cpu {
 
             m_state.setCarryFlag(msb1 != 0);
             m_state.setOverflowFlag(msb1 != msb2);
-            updateFlagsNoCarryOverflow16(val);
+            m_alu.updateFlagsNoCarryOverflow16(val);
         }
     }
 
@@ -2028,7 +1770,7 @@ public class Cpu {
 
             m_state.setCarryFlag(lsb != 0);
             m_state.setOverflowFlag(msb1 != msb2);
-            updateFlagsNoCarryOverflow16(val);
+            m_alu.updateFlagsNoCarryOverflow16(val);
         }
     }
 
@@ -2046,7 +1788,7 @@ public class Cpu {
 
             m_state.setCarryFlag(msb1 != 0);
             m_state.setOverflowFlag(msb1 != msb2);
-            updateFlagsNoCarryOverflow16(val);
+            m_alu.updateFlagsNoCarryOverflow16(val);
         }
     }
 
@@ -2176,59 +1918,15 @@ public class Cpu {
         }
     }
 
-    /**
-     * Returns true iff the given byte's bit parity is EVEN.
-     * @param value  Value for which bit parity will be tested.
-     * @return true iff the given byte's bit parity is EVEN.
-     */
-    private boolean getParity(byte value) {
-        return PARITY_TABLE[Unsigned.unsignedByte(value)];
-    }
-
-    /**
-     * Parity table implementation.
-     * An array memeber of 'true' means the bit parity for the given index is EVEN.
-     */
-    private static final boolean PARITY_TABLE[] = {
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true,
-        true, false, false, true, false, true, true, false,
-        true, false, false, true, false, true, true, false,
-        false, true, true, false, true, false, false, true
-    };
 
     /** Current state of registers & flags */
     private final CpuState m_state;
 
     /** Real-Mode memory used by this class */
     private final RealModeMemory m_memory;
+
+    /** Performs arithmetic/logic operations and updates flags */
+    private final Alu m_alu;
 
     /** Used to fetch next instruction bytes */
     private final OpcodeFetcher m_fetcher;
