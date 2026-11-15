@@ -4,8 +4,24 @@ import il.co.codeguru.corewars8086.memory.MemoryException;
 
 /**
  * 8086 shift and rotate instructions operating on the current indirect operand.
+ *
+ * All 14 instructions (7 operations x 8/16 bits) share one implementation,
+ * {@link #shift}. The few per-width differences in which flags get refreshed
+ * are kept as-is (see {@link FlagUpdate}).
  */
 final class ShiftOps {
+
+    private enum Kind { ROL, ROR, RCL, RCR, SHL, SHR, SAR }
+
+    /** Which of the Sign/Zero/Parity flags are refreshed after each step. */
+    private enum FlagUpdate {
+        /** Only Carry and Overflow change. */
+        NONE,
+        /** Sign, Zero and Parity are refreshed too. */
+        SZP,
+        /** Only Zero is refreshed. */
+        ZERO_ONLY
+    }
 
     private final CpuState m_state;
     private final IndirectAddressingDecoder m_indirect;
@@ -16,256 +32,85 @@ final class ShiftOps {
         m_indirect = indirect;
         m_alu = alu;
     }
-    void rol8(int count) throws MemoryException {
+
+    void rol8(int count) throws MemoryException { shift(Kind.ROL, 8, count, FlagUpdate.NONE); }
+    void ror8(int count) throws MemoryException { shift(Kind.ROR, 8, count, FlagUpdate.NONE); }
+    void rcl8(int count) throws MemoryException { shift(Kind.RCL, 8, count, FlagUpdate.NONE); }
+    void rcr8(int count) throws MemoryException { shift(Kind.RCR, 8, count, FlagUpdate.NONE); }
+    void shl8(int count) throws MemoryException { shift(Kind.SHL, 8, count, FlagUpdate.SZP); }
+    void shr8(int count) throws MemoryException { shift(Kind.SHR, 8, count, FlagUpdate.SZP); }
+    void sar8(int count) throws MemoryException { shift(Kind.SAR, 8, count, FlagUpdate.SZP); }
+
+    void rol16(int count) throws MemoryException { shift(Kind.ROL, 16, count, FlagUpdate.SZP); }
+    void ror16(int count) throws MemoryException { shift(Kind.ROR, 16, count, FlagUpdate.SZP); }
+    void rcl16(int count) throws MemoryException { shift(Kind.RCL, 16, count, FlagUpdate.SZP); }
+    void rcr16(int count) throws MemoryException { shift(Kind.RCR, 16, count, FlagUpdate.NONE); }
+    void shl16(int count) throws MemoryException { shift(Kind.SHL, 16, count, FlagUpdate.ZERO_ONLY); }
+    void shr16(int count) throws MemoryException { shift(Kind.SHR, 16, count, FlagUpdate.ZERO_ONLY); }
+    void sar16(int count) throws MemoryException { shift(Kind.SAR, 16, count, FlagUpdate.ZERO_ONLY); }
+
+    /**
+     * Shifts/rotates the current indirect operand one bit at a time.
+     *
+     * @param kind   operation to perform.
+     * @param bits   operand width: 8 or 16.
+     * @param count  repeat count (only the low 5 bits are used, like the 80186+).
+     * @param flags  which extra flags are refreshed after every step.
+     */
+    private void shift(Kind kind, int bits, int count, FlagUpdate flags) throws MemoryException {
         count &= 0x1F; // restrict count to 0-31
+        final int top = bits - 1;
+        final int mask = (1 << bits) - 1;
 
         for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
+            int val = (bits == 8) ? m_indirect.getMem8() : m_indirect.getMem16();
+            int lsb = val & 0x01;
+            int msb = (val >> top) & 0x01;
+            int cf = m_state.getCarryFlag() ? 1 : 0;
 
-            val = (byte)((val << 1) | msb1);
-            m_indirect.setMem8(val);
+            int raw;
+            boolean carryOut;
+            boolean overflowFromOld;
+            switch (kind) {
+                case ROL: raw = (val << 1) | msb;  carryOut = msb != 0; overflowFromOld = true;  break;
+                case RCL: raw = (val << 1) | cf;   carryOut = msb != 0; overflowFromOld = true;  break;
+                case SHL: raw = val << 1;          carryOut = msb != 0; overflowFromOld = true;  break;
+                case ROR: raw = ((val & mask) >>> 1) | (lsb << top); carryOut = lsb != 0; overflowFromOld = false; break;
+                case RCR: raw = ((val & mask) >>> 1) | (cf << top);  carryOut = lsb != 0; overflowFromOld = false; break;
+                case SHR: raw = (val & mask) >>> 1;                  carryOut = lsb != 0; overflowFromOld = false; break;
+                case SAR: raw = val >> 1;                            carryOut = lsb != 0; overflowFromOld = false; break;
+                default: throw new IllegalStateException();
+            }
 
-            m_state.setCarryFlag(msb1 != 0);
+            int result;
+            if (bits == 8) {
+                result = (byte) raw;
+                m_indirect.setMem8((byte) result);
+            } else {
+                result = (short) raw;
+                m_indirect.setMem16((short) result);
+            }
+
+            int ref = overflowFromOld ? val : result;
+            int msb1 = (ref >> top) & 0x01;
+            int msb2 = (ref >> (top - 1)) & 0x01;
+            m_state.setCarryFlag(carryOut);
             m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
 
-    void ror8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (byte)(((val & 0xFF) >>> 1) | (lsb << 7));
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    void rcl8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (byte)((val << 1) | cf);
-            m_indirect.setMem8(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    void rcr8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (byte)(((val & 0xFF) >>> 1) | (cf << 7));
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    void shl8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-
-            val = (byte)(val << 1);
-            m_indirect.setMem8(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow8(val);
-        }
-    }
-
-    void shr8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (byte)((val & 0xFF) >>> 1);
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow8(val);
-        }
-    }
-
-    void sar8(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            byte val = m_indirect.getMem8();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (byte)(val >> 1);
-            m_indirect.setMem8(val);
-
-            byte msb1 = (byte)((val >> 7) & 0x01);
-            byte msb2 = (byte)((val >> 6) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow8(val);
-        }
-    }
-
-    void rol16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            val = (short)((val << 1) | msb1);
-            m_indirect.setMem16(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow16(val);
-        }
-    }
-
-    void ror16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (short)(((val & 0xFFFF) >>> 1) | (lsb << 15));
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow16(val);
-        }
-    }
-
-    void rcl16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (short)((val << 1) | cf);
-            m_indirect.setMem16(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_alu.updateFlagsNoCarryOverflow16(val);
-        }
-    }
-
-    void rcr16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-            byte cf = (byte)(m_state.getCarryFlag() ? 1 : 0);
-
-            val = (short)(((val & 0xFFFF) >>> 1) | (cf << 15));
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-        }
-    }
-
-    void shl16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            val = (short)(val << 1);
-            m_indirect.setMem16(val);
-
-            m_state.setCarryFlag(msb1 != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_state.setZeroFlag(val == 0);
-        }
-    }
-
-    void shr16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (short) ((val & 0xFFFF) >>> 1);
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_state.setZeroFlag(val == 0);
-        }
-    }
-
-    void sar16(int count) throws MemoryException {
-        count &= 0x1F; // restrict count to 0-31
-
-        for (int i = 0; i < count; ++i) {
-            short val = m_indirect.getMem16();
-            byte lsb = (byte)(val & 0x01);
-
-            val = (short)(val >> 1);
-            m_indirect.setMem16(val);
-
-            byte msb1 = (byte)((val >> 15) & 0x01);
-            byte msb2 = (byte)((val >> 14) & 0x01);
-
-            m_state.setCarryFlag(lsb != 0);
-            m_state.setOverflowFlag(msb1 != msb2);
-            m_state.setZeroFlag(val == 0);
+            switch (flags) {
+                case SZP:
+                    if (bits == 8) {
+                        m_alu.updateFlagsNoCarryOverflow8((byte) result);
+                    } else {
+                        m_alu.updateFlagsNoCarryOverflow16((short) result);
+                    }
+                    break;
+                case ZERO_ONLY:
+                    m_state.setZeroFlag(result == 0);
+                    break;
+                default:
+                    break;
+            }
         }
     }
 }
